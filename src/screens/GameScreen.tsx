@@ -2,15 +2,15 @@ import { View, Text, Button, StyleSheet } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 
-export default function MenuScreen({ navigation }: Props) {
+export default function GameScreen({ navigation, route }: Props) {
+  const { levelId } = route.params;
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>SIX SEVEN - AURA FARMING</Text>
-      <Button title="PLAY" onPress={() => navigation.navigate('Game', { levelId: 1 })} />
-      <Button title="LEVELS LIST" onPress={() => navigation.navigate('LevelsList')} />
-      <Button title="CREDITS" onPress={() => {}} />
+      <Text style={styles.title}>LEVEL {levelId}</Text>
+      <Button title="(teste) FINALIZAR FASE" onPress={() => navigation.replace('Result', { levelId })} />
+      <Button title="MENU" onPress={() => navigation.navigate('Home')} />
     </View>
   );
 }
