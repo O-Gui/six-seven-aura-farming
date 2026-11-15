@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     width: '100%',
-    height: '100%',
+    height: '30%',
   },
   titleRow: {
     height: HEADER_ROW,
@@ -207,13 +207,15 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   barWrap: {
-    width: '100%',
+    width: '90%',
+    alignSelf: 'center',
   },
   playfield: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 10,
   },
   footer: {
     backgroundColor: colors.gameFooter,
