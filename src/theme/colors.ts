@@ -1,4 +1,3 @@
-// Valores aproximados, tirados do mockup. Troque pelos hex exatos do Figma.
 export const colors = {
   background: '#1E1F33',
   cyan: '#4FD1E3',
@@ -12,5 +11,9 @@ export const colors = {
   levelLockedText: '#F0605C',
   levelLockedGlow: '#E8512F',
   backArrow: '#7C86FF',
+  gameLane: '#34344A',
+  gameFooter: '#302E58',
+  gameFooterText: '#5CD3E0',
+  auraTrack: 'rgba(30, 60, 90, 0.35)',
+  auraYellow: '#E9D45F',
 };
-
