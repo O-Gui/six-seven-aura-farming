@@ -1,7 +1,9 @@
+
 import { useEffect } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -9,23 +11,68 @@ import Animated, {
 import { colors } from '../theme/colors';
 
 type Props = {
-  percent: number; // 0 a 100: porcentagem real de acertos
-  color?: string;
+  percent: number;
+  risk?: number;
 };
 
-export default function AuraBar({ percent, color = colors.auraYellow }: Props) {
-  const fill = useSharedValue(percent);
+export default function AuraBar({
+  percent,
+  risk = 0,
+}: Props) {
+  const fill = useSharedValue(
+    Math.max(0, Math.min(100, percent))
+  );
+
+  const riskValue = useSharedValue(
+    Math.max(0, Math.min(1, risk))
+  );
 
   useEffect(() => {
-    fill.value = withTiming(Math.max(0, Math.min(100, percent)), {
-      duration: 250,
-      easing: Easing.out(Easing.quad),
-    });
+    fill.value = withTiming(
+      Math.max(0, Math.min(100, percent)),
+      {
+        duration: 250,
+        easing: Easing.out(Easing.quad),
+      }
+    );
   }, [percent]);
 
-  const fillStyle = useAnimatedStyle(() => ({
-    width: `${fill.value}%` as `${number}%`,
-  }));
+  useEffect(() => {
+    riskValue.value = withTiming(
+      Math.max(0, Math.min(1, risk)),
+      {
+        duration: 350,
+        easing: Easing.inOut(Easing.quad),
+      }
+    );
+  }, [risk]);
+
+  const fillStyle = useAnimatedStyle(() => {
+    // Cor-base baseada na porcentagem real de acertos.
+    const performanceColor = interpolateColor(
+      fill.value,
+      [0, 51, 65, 90, 100],
+      [
+        colors.auraYellow,
+        colors.auraYellow,
+        '#90FFA8',
+        '#90FFA8',
+        '#7A90FF',
+      ]
+    );
+
+    // O risco aproxima a cor-base do vermelho.
+    const finalColor = interpolateColor(
+      riskValue.value,
+      [0, 1],
+      [performanceColor, '#FF2020']
+    );
+
+    return {
+      width: `${fill.value}%` as `${number}%`,
+      backgroundColor: finalColor,
+    };
+  });
 
   return (
     <View style={styles.container}>
@@ -34,8 +81,11 @@ export default function AuraBar({ percent, color = colors.auraYellow }: Props) {
         style={styles.frame}
         resizeMode="stretch"
       />
+
       <View style={styles.track}>
-        <Animated.View style={[styles.fill, { backgroundColor: color }, fillStyle]} />
+        <Animated.View
+          style={[styles.fill, fillStyle]}
+        />
       </View>
     </View>
   );
@@ -44,7 +94,7 @@ export default function AuraBar({ percent, color = colors.auraYellow }: Props) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    aspectRatio: 7.6, // largura/altura do PNG da barra; ajuste se esticar
+    aspectRatio: 7.6,
   },
   frame: {
     position: 'absolute',

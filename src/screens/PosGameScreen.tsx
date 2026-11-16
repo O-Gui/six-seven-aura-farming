@@ -1,21 +1,407 @@
-import { View, Text, Button, StyleSheet } from 'react-native';
+import { useEffect } from 'react';
+import type { ReactNode } from 'react';
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import AnimatedBackground from '../components/AnimatedBackground';
+import { LEVELS } from '../game/levels';
+import { hitPercent, missPercent, unlocksNextLevel } from '../game/scoring';
+import { useGameStore } from '../store/gameStore';
+import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Result'>;
 
+// Tamanho do mockup: todas as medidas abaixo estão nesse espaço
+const DESIGN_W = 463;
+const DESIGN_H = 1037;
+
+const STAR = require('../../assets/images/star.png');
+
+// Proporção real da imagem da estrela 67 (largura / altura)
+const STAR_67 = require('../../assets/images/67star.png');
+const STAR_67_SOURCE = Image.resolveAssetSource(STAR_67) ?? { width: 1, height: 1 };
+const STAR_67_WIDTH = STAR_67_SOURCE.width ?? 1;
+const STAR_67_HEIGHT = STAR_67_SOURCE.height ?? 1;
+const STAR_67_ASPECT = STAR_67_WIDTH / STAR_67_HEIGHT;
+
+// Posição e tamanho das 3 estrelas pequenas (esquerda, centro, direita)
+const SMALL_STARS = [
+  { x: 104, y: 128, size: 84 },
+  { x: 191, y: 78, size: 98 },
+  { x: 296, y: 128, size: 84 },
+];
+
+function formatPercent(value: number) {
+  return Number.isInteger(value) ? `${value}%` : `${value.toFixed(1)}%`;
+}
+
+// Faz o elemento "pular" para dentro da tela
+function PopIn({
+  delay,
+  enabled,
+  style,
+  children,
+}: {
+  delay: number;
+  enabled: boolean;
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  const progress = useSharedValue(enabled ? 0 : 1);
+
+  useEffect(() => {
+    if (enabled) {
+      progress.value = withDelay(delay, withSpring(1, { damping: 9, stiffness: 140 }));
+    }
+  }, []);
+
+  const animated = useAnimatedStyle(() => ({
+    opacity: Math.min(progress.value * 2, 1),
+    transform: [{ scale: 0.3 + progress.value * 0.7 }],
+  }));
+
+  return <Animated.View style={[style, animated]}>{children}</Animated.View>;
+}
+
 export default function PosGameScreen({ navigation, route }: Props) {
   const { levelId } = route.params;
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+
+  const playedLevelId = useGameStore((s) => s.levelId);
+  const storeHits = useGameStore((s) => s.hits);
+  const storeMisses = useGameStore((s) => s.misses);
+  const storeTotal = useGameStore((s) => s.totalNotes);
+  const storeStars = useGameStore((s) => s.stars);
+  const storeOutcome = useGameStore((s) => s.outcome);
+
+  // Só usa os dados se forem da fase que foi jogada; senão, tudo zerado
+  const hasData = playedLevelId === levelId;
+  const hits = hasData ? storeHits : 0;
+  const misses = hasData ? storeMisses : 0;
+  const totalNotes = hasData ? storeTotal : 0;
+  const stars = hasData ? storeStars : 0;
+  const outcome = hasData ? storeOutcome : null;
+
+  const hitsPct = hitPercent(hits, totalNotes);
+  const missesPct = missPercent(misses, totalNotes);
+  const accuracyPct = hitsPct; // acertos / total de notas
+  const isPerfect = outcome === 'perfect';
+  const canGoNext = unlocksNextLevel(stars) && levelId < LEVELS.length;
+
+  // Escala: o mockup inteiro tem que caber na área visível
+  const availableHeight = height - insets.top - insets.bottom;
+  const scale = Math.min(width / DESIGN_W, availableHeight / DESIGN_H);
+  const u = (n: number) => n * scale;
+  const offsetX = (width - u(DESIGN_W)) / 2;
+  const offsetY = insets.top + (availableHeight - u(DESIGN_H)) / 2;
+
+  // Caixa de texto centralizada em (cx, cy), nas medidas do mockup
+  const box = (cx: number, cy: number, w: number, h: number) => ({
+    position: 'absolute' as const,
+    left: u(cx - w / 2),
+    top: u(cy - h / 2),
+    width: u(w),
+    height: u(h),
+    lineHeight: u(h),
+    textAlign: 'center' as const,
+    includeFontPadding: false,
+  });
+
+  const stateLabel = outcome === 'lost' ? 'FASE PERDIDA' : 'FASE CONCLUÍDA';
+
+  const goNext = () => {
+    if (canGoNext) navigation.replace('Game', { levelId: levelId + 1 });
+  };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>RESULTADO - LEVEL {levelId}</Text>
-      <Button title="LEVEL LIST" onPress={() => navigation.navigate('LevelsList')} />
-      <Button title="NEXT LEVEL" onPress={() => navigation.replace('Game', { levelId: levelId + 1 })} />
+    <View style={styles.root}>
+      {/* Bordas laterais */}
+      <View style={styles.frames} pointerEvents="none">
+        <Image
+          source={require('../../assets/images/bg-left-menu.png')}
+          style={styles.leftImage}
+          resizeMode="contain"
+        />
+        <Image
+          source={require('../../assets/images/bg-right-menu.png')}
+          style={styles.rightImage}
+          resizeMode="contain"
+        />
+      </View>
+
+      <AnimatedBackground />
+
+      <View
+        style={{
+          position: 'absolute',
+          left: offsetX,
+          top: offsetY,
+          width: u(DESIGN_W),
+          height: u(DESIGN_H),
+        }}
+      >
+        {/* Três estrelas pequenas */}
+        {SMALL_STARS.map((star, i) => {
+          const earned = stars > i;
+          return (
+            <PopIn
+              key={i}
+              enabled={earned}
+              delay={300 + i * 300}
+              style={{
+                position: 'absolute',
+                left: u(star.x),
+                top: u(star.y),
+                width: u(star.size),
+                height: u(star.size),
+              }}
+            >
+              <Image
+                source={STAR}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  tintColor: earned ? undefined : colors.starOff,
+                }}
+                resizeMode="contain"
+              />
+            </PopIn>
+          );
+        })}
+
+        {/* Estrela "67": só com 100% de acertos */}
+        {isPerfect ? (
+          <PopIn
+            enabled
+            delay={1300}
+            style={{
+              position: 'absolute',
+              left: u(65),
+              top: u(195),
+              width: u(350),
+              aspectRatio: STAR_67_ASPECT,
+            }}
+          >
+            <Image
+              source={STAR_67}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="contain"
+            />
+          </PopIn>
+        ) : (
+          <Text
+            style={[
+              box(240, 315, 340, 60),
+              styles.stateLabel,
+              {
+                fontSize: u(34),
+                color: outcome === 'lost' ? colors.resultRed : colors.starYellow,
+              },
+            ]}
+          >
+            {stateLabel}
+          </Text>
+        )}
+        {isPerfect && (
+          <>
+            <Text style={[box(106, 349, 80, 30), styles.sideText, { fontSize: u(24) }]}>
+              SIX
+            </Text>
+            <Text style={[box(365, 349, 90, 30), styles.sideText, { fontSize: u(24) }]}>
+              SEVEN
+            </Text>
+            <Text style={[box(240, 330, 200, 80), styles.bigNumber, { fontSize: u(66) }]}>
+              67
+            </Text>
+          </>
+        )}
+
+        <Text style={[box(237, 452, 200, 30), styles.levelLabel, { fontSize: u(22) }]}>
+          LEVEL {levelId}
+        </Text>
+
+        {/* Painel: acertos, erros e acurácia */}
+        <View
+          style={{
+            position: 'absolute',
+            left: u(85),
+            top: u(483),
+            width: u(304),
+            height: u(259),
+            borderRadius: u(38),
+            borderWidth: 2,
+            borderColor: colors.resultBorder,
+            backgroundColor: colors.resultPanel,
+          }}
+        />
+        {[
+          { label: 'ACERTOS', value: hitsPct, color: colors.resultGreen, line: colors.resultLine, top: 538 },
+          { label: 'ERROS', value: missesPct, color: colors.resultRed, line: colors.resultLineMuted, top: 593 },
+          { label: 'ACURÁCIA', value: accuracyPct, color: colors.resultGreen, line: colors.resultLine, top: 648 },
+        ].map((row) => (
+          <View
+            key={row.label}
+            style={{
+              position: 'absolute',
+              left: u(104),
+              top: u(row.top),
+              width: u(261),
+              height: u(36),
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'flex-end',
+              paddingBottom: u(3),
+              borderBottomWidth: 2,
+              borderBottomColor: row.line,
+            }}
+          >
+            <Text style={{ color: colors.resultLabel, fontSize: u(21) }}>{row.label}</Text>
+            <Text style={{ color: row.color, fontSize: u(21) }}>
+              {formatPercent(row.value)}
+            </Text>
+          </View>
+        ))}
+
+        {/* Notas acertadas */}
+        <Image
+          source={require('../../assets/images/box-de-acertos.png')}
+          style={{
+            position: 'absolute',
+            left: u(40),
+            top: u(770),
+            width: u(385),
+            height: u(165),
+          }}
+          resizeMode="stretch"
+        />
+        <Text style={[box(233, 826, 300, 26), styles.notesLabel, { fontSize: u(19) }]}>
+          NOTAS ACERTADAS
+        </Text>
+        <Text style={[box(238, 882, 300, 74), styles.notesNumber, { fontSize: u(64) }]}>
+          {hits}
+        </Text>
+
+        {/* Navegação */}
+        <Pressable
+          onPress={() => navigation.navigate('LevelsList')}
+          onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.linkButton,
+            { left: u(48), top: u(944), height: u(40), gap: u(6) },
+            pressed && styles.linkPressed,
+          ]}
+        >
+          <Feather name="arrow-left" size={u(38)} color={colors.backArrow} />
+          <Text style={[styles.linkText, { fontSize: Math.max(11, u(12)) }]}>
+            LEVEL LIST
+          </Text>
+        </Pressable>
+
+        <Pressable
+          disabled={!canGoNext}
+          onPress={goNext}
+          onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.linkButton,
+            { right: u(DESIGN_W - 414), top: u(944), height: u(40), gap: u(6) },
+            !canGoNext && styles.linkDisabled,
+            pressed && styles.linkPressed,
+          ]}
+        >
+          <Text style={[styles.linkText, { fontSize: Math.max(11, u(12)) }]}>
+            NEXT LEVEL
+          </Text>
+          <Feather name="arrow-right" size={u(38)} color={colors.backArrow} />
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#14142B', alignItems: 'center', justifyContent: 'center', gap: 16 },
-  title: { color: '#fff', fontSize: 22 },
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  frames: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  leftImage: {
+    position: 'absolute',
+    left: 10,
+    top: 0,
+    bottom: 0,
+    width: '35%',
+    height: '100%',
+  },
+  rightImage: {
+    position: 'absolute',
+    right: 10,
+    top: 0,
+    bottom: 0,
+    width: '35%',
+    height: '100%',
+  },
+  stateLabel: {
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  sideText: {
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  bigNumber: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  levelLabel: {
+    color: colors.resultLabel,
+    letterSpacing: 1,
+  },
+  notesLabel: {
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  notesNumber: {
+    color: '#FFFFFF',
+  },
+  linkButton: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  linkText: {
+    color: colors.backArrow,
+    letterSpacing: 1,
+  },
+  linkDisabled: {
+    opacity: 0.3,
+  },
+  linkPressed: {
+    opacity: 0.6,
+  },
 });

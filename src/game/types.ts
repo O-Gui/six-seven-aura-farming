@@ -1,8 +1,18 @@
+
 export type LaneId = 'left' | 'right';
 
 export type BeatmapNote = {
+  id: string;
+  timeMs: number;
   lane: LaneId;
-  timeToHitMs: number; // instante ideal do toque, em ms desde o início da música
 };
 
 export type NoteResult = 'hit' | 'miss';
+
+export type Beatmap = {
+  id: string;
+  title: string;
+  bpm: number;
+  approachTimeMs: number;
+  notes: BeatmapNote[];
+};

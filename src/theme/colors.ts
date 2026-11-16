@@ -16,4 +16,13 @@ export const colors = {
   gameFooterText: '#5CD3E0',
   auraTrack: 'rgba(30, 60, 90, 0.35)',
   auraYellow: '#E9D45F',
+  resultBorder: '#4A8FE5',
+  resultPanel: '#1B3149',
+  resultLabel: '#4FB3C8',
+  resultGreen: '#4CC96A',
+  resultRed: '#E0545A',
+  resultLine: '#3F7FD8',
+  resultLineMuted: '#2F3D50',
+  starYellow: '#FFDB4D',
+  starOff: '#34364F',
 };

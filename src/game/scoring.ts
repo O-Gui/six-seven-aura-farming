@@ -56,3 +56,37 @@ export function unlocksNextLevel(stars: number): boolean {
 export function earnsReward67(stars: number): boolean {
   return stars === 3;
 }
+
+
+/**
+ * Converte a margem de erros toleráveis em risco visual.
+ *
+ * 0 = sem risco adicional
+ * 1 = margem zero, risco máximo
+ */
+
+export function riskLevel(
+  hits: number,
+  remainingNotes: number,
+  totalNotes: number
+): number {
+  if (totalNotes <= 0) return 0;
+
+  const initialMargin =
+    totalNotes - minHitsToSurvive(totalNotes);
+
+  // Se não existe margem para errar desde o início.
+  if (initialMargin <= 0) return 1;
+
+  const margin = errorMargin(
+    hits,
+    remainingNotes,
+    totalNotes
+  );
+
+  return Math.max(
+    0,
+    Math.min(1, 1 - margin / initialMargin)
+  );
+}
+
