@@ -8,3 +8,6 @@ A UNWAKE Studio é um estúdio independente recém-criado, idealizado para desen
 
 ## ACESSE A WIKI PARA MAIS INFORMAÇÕES
 ### https://github.com/O-Gui/six-seven-aura-farming/wiki
+
+## ACESSE O FIGMA
+### https://www.figma.com/design/HjVuCk0ACNbUFfKFO1lHem/six-seven-aura-farming?node-id=0-1&p=f&t=I2GIxsmbN516s3fa-0
