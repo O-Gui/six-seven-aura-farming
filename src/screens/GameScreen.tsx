@@ -6,6 +6,7 @@ import type {
 } from 'react';
 import { useIsFocused } from '@react-navigation/native';
 import {
+  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -44,12 +45,14 @@ import {
   canHitNote,
   getNotePosition,
 } from '../game/notePosition';
+import { isLevelImplemented } from '../game/levels';
+import { useProgressStore } from '../store/progressStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 
 const HEADER_ROW = 48;
 const FOOTER_HEIGHT = 110;
-const COUNTDOWN_DURATION = 3000;
+const COUNTDOWN_DURATION = 4000;
 
 type Beatmap = ReturnType<typeof getBeatmap>;
 type GameStatus = ReturnType<typeof useGameStore.getState>['status'];
@@ -108,7 +111,6 @@ function prepareBeatmap(beatmap: Beatmap): PreparedBeatmap {
 }
 
 // Atualiza somente as notas que estão na janela de execução.
-// Uma nota só vira erro quando passa completamente pela hitbox.
 function updateActiveNotes(
   currentTimeMs: number,
   beatmap: Beatmap,
@@ -142,7 +144,6 @@ function updateActiveNotes(
     const hitboxBottom =
       position.targetCenterY + laneWidth / 2 + 3;
 
-    // A borda superior já ultrapassou a hitbox.
     return position.top >= hitboxBottom;
   };
 
@@ -188,7 +189,6 @@ function updateActiveNotes(
 
   nextNoteCursor.current = cursor;
 
-  // Registra os erros das notas que ultrapassaram a hitbox.
   for (const index of expiredIndices) {
     useGameStore.getState().resolveNote(index, 'miss');
   }
@@ -279,6 +279,7 @@ type ActiveNoteProps = {
   gameClock: SharedValue<number>;
   approachTimeMs: number;
   source: number;
+  trailSource: number;
 };
 
 // Cada nota observa somente o próprio estado de acerto.
@@ -290,6 +291,7 @@ const ActiveNote = memo(function ActiveNote({
   gameClock,
   approachTimeMs,
   source,
+  trailSource,
 }: ActiveNoteProps) {
   const isHit = useGameStore(
     (state) => state.resolved[index] === 'hit',
@@ -302,6 +304,7 @@ const ActiveNote = memo(function ActiveNote({
   return (
     <FallingNote
       source={source}
+      trailSource={trailSource}
       laneWidth={laneWidth}
       laneHeight={laneHeight}
       gameClock={gameClock}
@@ -331,7 +334,6 @@ export default function GameScreen({ navigation, route }: Props) {
   const laneWidth = width * 0.29;
   const laneGap = width * 0.18;
 
-  // Carrega e prepara o level uma única vez por ID.
   const beatmap = useMemo(
     () => getBeatmap(levelId),
     [levelId],
@@ -342,7 +344,6 @@ export default function GameScreen({ navigation, route }: Props) {
     [beatmap],
   );
 
-  // Calcula automaticamente o pré-roll com base na primeira nota.
   const preRollDurationMs = useMemo(() => {
     if (beatmap.notes.length === 0) return 0;
 
@@ -357,10 +358,26 @@ export default function GameScreen({ navigation, route }: Props) {
     );
   }, [beatmap]);
 
+  // Player da música principal.
   const player = useAudioPlayer(
     require('../../assets/music/Korobeiniki_funk.mp3'),
     { updateInterval: 16 },
   );
+
+  // Player exclusivo da contagem regressiva.
+  const countdownPlayer = useAudioPlayer(
+    require('../../assets/sounds/contagem_regressiva.mp3'),
+  );
+
+  // SOM DOS BOTÕES: um único player para os botões desta tela.
+  const buttonSoundPlayer = useAudioPlayer(
+    require('../../assets/sounds/som_botoes_menu.mp3'),
+  );
+
+  const playButtonSound = () => {
+    void buttonSoundPlayer.seekTo(0);
+    buttonSoundPlayer.play();
+  };
 
   const gameClock = useSharedValue(-COUNTDOWN_DURATION);
   const gameTimeRef = useRef(-COUNTDOWN_DURATION);
@@ -374,7 +391,10 @@ export default function GameScreen({ navigation, route }: Props) {
 
   const countdownRemaining = useRef(COUNTDOWN_DURATION);
 
-  // A tela observa somente o status da partida.
+  const countdownAudioEnabled = useRef(false);
+  const countdownAudioStarted = useRef(false);
+  const countdownAudioStarting = useRef(false);
+
   const status = useGameStore((state) => state.status);
 
   const {
@@ -390,10 +410,23 @@ export default function GameScreen({ navigation, route }: Props) {
     if (!isFocused) {
       player.pause();
       player.seekTo(0);
+
+      countdownPlayer.pause();
+      countdownPlayer.seekTo(0);
+
+      return;
+    }
+
+    if (!isLevelImplemented(levelId)) {
+      navigation.replace('LevelsList');
       return;
     }
 
     countdownRemaining.current = COUNTDOWN_DURATION;
+
+    countdownAudioEnabled.current = true;
+    countdownAudioStarted.current = false;
+    countdownAudioStarting.current = false;
 
     nextNoteCursor.current = 0;
     activeNoteIndicesRef.current = [];
@@ -408,8 +441,56 @@ export default function GameScreen({ navigation, route }: Props) {
     player.pause();
     player.seekTo(0);
 
+    countdownPlayer.pause();
+    countdownPlayer.seekTo(0);
+
+    useProgressStore.getState().setLastPlayedLevel(levelId);
+
     startLevel(levelId, beatmap.notes.length);
-  }, [isFocused, levelId]);
+  }, [isFocused, levelId, navigation]);
+
+  // Reprodução e controle do áudio da contagem.
+  useEffect(() => {
+    if (
+      !isFocused ||
+      status !== 'countdown' ||
+      !countdownAudioEnabled.current
+    ) {
+      countdownPlayer.pause();
+      return;
+    }
+
+    if (
+      !countdownAudioStarted.current &&
+      !countdownAudioStarting.current
+    ) {
+      countdownAudioStarting.current = true;
+
+      const startCountdownAudio = async () => {
+        try {
+          await countdownPlayer.seekTo(0);
+
+          countdownAudioStarting.current = false;
+          countdownAudioStarted.current = true;
+
+          if (
+            countdownAudioEnabled.current &&
+            isFocused &&
+            useGameStore.getState().status === 'countdown'
+          ) {
+            countdownPlayer.play();
+          }
+        } catch (error) {
+          countdownAudioStarting.current = false;
+          console.warn('Erro ao iniciar áudio da contagem:', error);
+        }
+      };
+
+      void startCountdownAudio();
+    } else if (countdownAudioStarted.current) {
+      countdownPlayer.play();
+    }
+  }, [status, isFocused, countdownPlayer]);
 
   // Countdown seguido pelo pré-roll das notas.
   useEffect(() => {
@@ -422,7 +503,6 @@ export default function GameScreen({ navigation, route }: Props) {
     let preRollInterval: ReturnType<typeof setInterval> | null = null;
 
     const startPreRoll = async () => {
-      // Garante que a música esteja posicionada no início.
       try {
         await player.seekTo(0);
       } catch {
@@ -431,7 +511,6 @@ export default function GameScreen({ navigation, route }: Props) {
 
       if (cancelled || !isFocused) return;
 
-      // Reinicia o agendamento das notas.
       nextNoteCursor.current = 0;
       activeNoteIndicesRef.current = [];
       setActiveNoteIndices([]);
@@ -443,7 +522,6 @@ export default function GameScreen({ navigation, route }: Props) {
 
         const elapsed = Date.now() - preRollStartAt;
 
-        // O relógio começa negativo e termina em zero.
         const visualTime = Math.min(
           elapsed - preRollDurationMs,
           0,
@@ -452,7 +530,6 @@ export default function GameScreen({ navigation, route }: Props) {
         gameClock.value = visualTime;
         gameTimeRef.current = visualTime;
 
-        // Faz as notas começarem a cair antes da música.
         updateActiveNotes(
           visualTime,
           beatmap,
@@ -464,7 +541,6 @@ export default function GameScreen({ navigation, route }: Props) {
           laneHeight,
         );
 
-        // Quando o pré-roll termina, começa a música.
         if (elapsed >= preRollDurationMs) {
           if (preRollInterval !== null) {
             clearInterval(preRollInterval);
@@ -479,7 +555,6 @@ export default function GameScreen({ navigation, route }: Props) {
         }
       };
 
-      // Atualiza imediatamente para mostrar a primeira nota.
       preRollInterval = setInterval(updatePreRoll, 16);
       updatePreRoll();
     };
@@ -500,7 +575,9 @@ export default function GameScreen({ navigation, route }: Props) {
         countdownRemaining.current = 0;
         setCountdownLabel('GO!');
 
-        // Inicia o pré-roll, sem iniciar a música ainda.
+        countdownAudioEnabled.current = false;
+        countdownPlayer.pause();
+
         void startPreRoll();
 
         return;
@@ -532,6 +609,7 @@ export default function GameScreen({ navigation, route }: Props) {
     status,
     isFocused,
     player,
+    countdownPlayer,
     preRollDurationMs,
     beginPlaying,
     beatmap,
@@ -572,23 +650,34 @@ export default function GameScreen({ navigation, route }: Props) {
     return () => clearTimeout(timeout);
   }, [countdownLabel]);
 
-  // Para o áudio ao terminar.
+  // Para os áudios ao terminar.
   useEffect(() => {
     if (status === 'finished') {
       player.pause();
+      countdownPlayer.pause();
     }
-  }, [status]);
+  }, [status, player, countdownPlayer]);
 
-  // Abre a tela de resultado.
+  // Aguarda 3 segundos antes de abrir a tela de resultado.
   useEffect(() => {
-    if (status === 'finished') {
+    if (status !== 'finished') return;
+
+    const timeout = setTimeout(() => {
       navigation.replace('Result', { levelId });
-    }
+    }, 1000);
+
+    return () => clearTimeout(timeout);
   }, [status, levelId, navigation]);
 
   const goToMenu = () => {
+    playButtonSound();
+
     player.pause();
     player.seekTo(0);
+
+    countdownAudioEnabled.current = false;
+    countdownPlayer.pause();
+    countdownPlayer.seekTo(0);
 
     useGameStore.getState().reset();
 
@@ -596,6 +685,8 @@ export default function GameScreen({ navigation, route }: Props) {
   };
 
   const pauseGame = () => {
+    playButtonSound();
+
     const currentStatus = useGameStore.getState().status;
 
     pause();
@@ -603,9 +694,15 @@ export default function GameScreen({ navigation, route }: Props) {
     if (currentStatus === 'playing') {
       player.pause();
     }
+
+    if (currentStatus === 'countdown') {
+      countdownPlayer.pause();
+    }
   };
 
   const resumeGame = () => {
+    playButtonSound();
+
     const previousStatus = useGameStore.getState().pausedFrom;
 
     resume();
@@ -613,15 +710,22 @@ export default function GameScreen({ navigation, route }: Props) {
     if (previousStatus === 'playing') {
       player.play();
     }
+
+    if (
+      previousStatus === 'countdown' &&
+      countdownAudioEnabled.current
+    ) {
+      countdownPlayer.play();
+    }
   };
 
   // Procura somente entre as notas atualmente ativas.
   const handleLanePress = (lane: 'left' | 'right') => {
     const game = useGameStore.getState();
 
-    if (game.status !== 'playing' || laneHeight <= 0) return;
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // LOGS DE DEPURAÇÃO REMOVIDOS.
+    if (game.status !== 'playing') return;
+    if (laneHeight <= 0) return;
 
     const currentTimeMs = gameTimeRef.current;
     let bestIndex = -1;
@@ -641,14 +745,10 @@ export default function GameScreen({ navigation, route }: Props) {
         beatmap.approachTimeMs,
       );
 
-      if (!position || !canHitNote(position, laneWidth)) {
-        continue;
-      }
+      if (!position || !canHitNote(position, laneWidth)) continue;
 
       const distance = Math.abs(
-        position.top +
-        position.noteHeight / 2 -
-        position.targetCenterY,
+        position.top + position.noteHeight / 2 - position.targetCenterY,
       );
 
       if (distance < bestDistance) {
@@ -708,6 +808,8 @@ export default function GameScreen({ navigation, route }: Props) {
           width={laneWidth}
           onHeightChange={setLaneHeight}
           onPress={() => handleLanePress('left')}
+          canInteract={status === 'playing'}
+          laneId="left"
         >
           {activeNoteIndices.map((index) => {
             const note = beatmap.notes[index];
@@ -720,6 +822,7 @@ export default function GameScreen({ navigation, route }: Props) {
                 index={index}
                 note={note}
                 source={require('../../assets/images/nota-vermelho6.png')}
+                trailSource={require('../../assets/images/rastro_vermelho.png')}
                 laneWidth={laneWidth}
                 laneHeight={laneHeight}
                 gameClock={gameClock}
@@ -733,6 +836,8 @@ export default function GameScreen({ navigation, route }: Props) {
           width={laneWidth}
           onHeightChange={setLaneHeight}
           onPress={() => handleLanePress('right')}
+          canInteract={status === 'playing'}
+          laneId="right"
         >
           {activeNoteIndices.map((index) => {
             const note = beatmap.notes[index];
@@ -745,6 +850,7 @@ export default function GameScreen({ navigation, route }: Props) {
                 index={index}
                 note={note}
                 source={require('../../assets/images/nota-azul7.png')}
+                trailSource={require('../../assets/images/rastro_azul.png')}
                 laneWidth={laneWidth}
                 laneHeight={laneHeight}
                 gameClock={gameClock}
@@ -783,6 +889,20 @@ export default function GameScreen({ navigation, route }: Props) {
         <Text style={styles.footerText}>LEVEL {levelId}</Text>
       </View>
 
+      {/* Loading da transição para o resultado */}
+      {status === 'finished' && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator
+            size="large"
+            color={colors.cyan}
+          />
+
+          <Text style={styles.loadingText}>
+            PREPARANDO RESULTADO...
+          </Text>
+        </View>
+      )}
+
       {/* Menu de pausa */}
       <Modal
         visible={status === 'paused'}
@@ -813,14 +933,6 @@ export default function GameScreen({ navigation, route }: Props) {
                 onPress={goToMenu}
               />
             </View>
-
-            <Pressable
-              onPress={() => navigation.replace('Result', { levelId })}
-            >
-              <Text style={styles.testLink}>
-                (teste) FINALIZAR FASE
-              </Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -829,6 +941,26 @@ export default function GameScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  loadingOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    gap: 18,
+    paddingBottom: '40%',
+  },
+
+  loadingText: {
+    color: colors.cyan,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 2,
+    textShadowColor: colors.cyan,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+
   root: {
     flex: 1,
     backgroundColor: colors.background,

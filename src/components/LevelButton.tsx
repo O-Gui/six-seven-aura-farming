@@ -1,3 +1,4 @@
+
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -20,14 +21,11 @@ const LOCK_RED = '#FF3B3B';
 const LOCK_WHITE = '#FFFFFF';
 const ICON_SIZE = 38;
 
-// Linha do tempo do cadeado (progresso de 0 a 1):
-// branco -> vermelho -> branco -> vermelho -> volta ao normal
 const WHITE_IN = [0, 0.01, 0.14, 0.15, 0.4, 0.41, 0.54, 0.55, 1];
 const WHITE_OUT = [0, 1, 1, 0, 0, 1, 1, 0, 0];
 const RED_IN = [0, 0.14, 0.15, 0.4, 0.41, 0.54, 0.55, 0.8, 1];
 const RED_OUT = [0, 0, 1, 1, 0, 0, 1, 1, 0];
 
-// Círculo centrado no cadeado, usado para simular o brilho
 function disc(size: number, color: string, opacity: number) {
   return {
     position: 'absolute' as const,
@@ -44,46 +42,65 @@ function disc(size: number, color: string, opacity: number) {
 type Props = {
   label: string;
   locked: boolean;
+  comingSoon?: boolean;
   onPress: () => void;
 };
 
-export default function LevelButton({ label, locked, onPress }: Props) {
-  // Fase liberada
+export default function LevelButton({
+  label,
+  locked,
+  comingSoon = false,
+  onPress,
+}: Props) {
   const glow = useSharedValue(0);
-  // Fase bloqueada (só o cadeado)
   const lockProgress = useSharedValue(0);
   const lockShake = useSharedValue(0);
 
   const glowColor = colors.levelUnlockedGlow;
-  const textColor = locked ? colors.levelLockedText : colors.levelUnlockedText;
+  const isUnavailable = locked || comingSoon;
+  const textColor = isUnavailable
+    ? colors.levelLockedText
+    : colors.levelUnlockedText;
 
-  // --- Estilos da fase liberada ---
-  const haloStyle = useAnimatedStyle(() => ({ opacity: glow.value * 0.35 }));
-  const outerStyle = useAnimatedStyle(() => ({ opacity: glow.value * 0.45 }));
-  const innerStyle = useAnimatedStyle(() => ({ opacity: glow.value * 0.8 }));
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: glow.value * 0.35,
+  }));
+
+  const outerStyle = useAnimatedStyle(() => ({
+    opacity: glow.value * 0.45,
+  }));
+
+  const innerStyle = useAnimatedStyle(() => ({
+    opacity: glow.value * 0.8,
+  }));
+
   const bodyStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - glow.value * 0.03 }],
   }));
+
   const textGlow = useAnimatedStyle(() => ({
     textShadowRadius: glow.value * 18,
   }));
 
-  // --- Estilos do cadeado ---
   const lockShakeStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: lockShake.value },
       { rotate: `${lockShake.value * 1.5}deg` },
     ],
   }));
+
   const whiteTint = useAnimatedStyle(() => ({
     opacity: interpolate(lockProgress.value, WHITE_IN, WHITE_OUT),
   }));
+
   const redTint = useAnimatedStyle(() => ({
     opacity: interpolate(lockProgress.value, RED_IN, RED_OUT),
   }));
+
   const whiteHalo = useAnimatedStyle(() => ({
     opacity: interpolate(lockProgress.value, WHITE_IN, WHITE_OUT) * 0.6,
   }));
+
   const redHalo = useAnimatedStyle(() => ({
     opacity: interpolate(lockProgress.value, RED_IN, RED_OUT),
   }));
@@ -92,7 +109,10 @@ export default function LevelButton({ label, locked, onPress }: Props) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
     lockProgress.value = 0;
-    lockProgress.value = withTiming(1, { duration: 800, easing: Easing.linear });
+    lockProgress.value = withTiming(1, {
+      duration: 800,
+      easing: Easing.linear,
+    });
 
     lockShake.value = withSequence(
       withTiming(-6, { duration: 40 }),
@@ -102,21 +122,28 @@ export default function LevelButton({ label, locked, onPress }: Props) {
   };
 
   const handlePressIn = () => {
+    if (comingSoon) return;
+
     if (locked) {
       triggerLockedFeedback();
       return;
     }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     glow.value = withTiming(1, { duration: 80 });
   };
 
   const handlePressOut = () => {
-    if (locked) return;
-    glow.value = withTiming(0, { duration: 450, easing: Easing.out(Easing.quad) });
+    if (isUnavailable) return;
+
+    glow.value = withTiming(0, {
+      duration: 450,
+      easing: Easing.out(Easing.quad),
+    });
   };
 
   const handlePress = () => {
-    if (!locked) onPress();
+    if (!isUnavailable) onPress();
   };
 
   return (
@@ -125,24 +152,32 @@ export default function LevelButton({ label, locked, onPress }: Props) {
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      disabled={comingSoon}
     >
       <Animated.View style={[styles.fill, bodyStyle]}>
         <Image
-          source={locked ? BG_LOCKED : BG_UNLOCKED}
+          source={isUnavailable ? BG_LOCKED : BG_UNLOCKED}
           style={styles.fill}
           resizeMode="contain"
         />
 
-        {/* Brilho do botão: só nas fases liberadas */}
-        {!locked && (
+        {!isUnavailable && (
           <>
             <Animated.View
               pointerEvents="none"
-              style={[styles.halo, { backgroundColor: glowColor }, haloStyle]}
+              style={[
+                styles.halo,
+                { backgroundColor: glowColor },
+                haloStyle,
+              ]}
             />
             <Animated.View
               pointerEvents="none"
-              style={[styles.glowOuter, { backgroundColor: glowColor }, outerStyle]}
+              style={[
+                styles.glowOuter,
+                { backgroundColor: glowColor },
+                outerStyle,
+              ]}
             />
             <Animated.View
               pointerEvents="none"
@@ -156,38 +191,73 @@ export default function LevelButton({ label, locked, onPress }: Props) {
         )}
 
         <View style={styles.iconSlot}>
-          {locked ? (
-            <Animated.View style={[styles.iconBox, lockShakeStyle]}>
-              {/* Brilho branco */}
-              <Animated.View pointerEvents="none" style={[styles.haloGroup, whiteHalo]}>
-                <View style={disc(76, LOCK_WHITE, 0.12)} />
-                <View style={disc(58, LOCK_WHITE, 0.2)} />
-                <View style={disc(44, LOCK_WHITE, 0.3)} />
-              </Animated.View>
+          {isUnavailable ? (
+            <Animated.View
+              style={[
+                styles.iconBox,
+                !comingSoon && lockShakeStyle,
+              ]}
+            >
+              {!comingSoon && (
+                <>
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[styles.haloGroup, whiteHalo]}
+                  >
+                    <View style={disc(76, LOCK_WHITE, 0.12)} />
+                    <View style={disc(58, LOCK_WHITE, 0.2)} />
+                    <View style={disc(44, LOCK_WHITE, 0.3)} />
+                  </Animated.View>
 
-              {/* Brilho vermelho */}
-              <Animated.View pointerEvents="none" style={[styles.haloGroup, redHalo]}>
-                <View style={disc(76, LOCK_RED, 0.14)} />
-                <View style={disc(58, LOCK_RED, 0.24)} />
-                <View style={disc(44, LOCK_RED, 0.36)} />
-              </Animated.View>
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[styles.haloGroup, redHalo]}
+                  >
+                    <View style={disc(76, LOCK_RED, 0.14)} />
+                    <View style={disc(58, LOCK_RED, 0.24)} />
+                    <View style={disc(44, LOCK_RED, 0.36)} />
+                  </Animated.View>
+                </>
+              )}
 
-              {/* Cadeado normal + versões tingidas por cima */}
-              <Image source={ICON_LOCK} style={styles.icon} resizeMode="contain" />
-              <Animated.Image
+              <Image
                 source={ICON_LOCK}
+                style={styles.icon}
                 resizeMode="contain"
-                style={[styles.icon, styles.iconOverlay, { tintColor: LOCK_WHITE }, whiteTint]}
               />
-              <Animated.Image
-                source={ICON_LOCK}
-                resizeMode="contain"
-                style={[styles.icon, styles.iconOverlay, { tintColor: LOCK_RED }, redTint]}
-              />
+
+              {!comingSoon && (
+                <>
+                  <Animated.Image
+                    source={ICON_LOCK}
+                    resizeMode="contain"
+                    style={[
+                      styles.icon,
+                      styles.iconOverlay,
+                      { tintColor: LOCK_WHITE },
+                      whiteTint,
+                    ]}
+                  />
+                  <Animated.Image
+                    source={ICON_LOCK}
+                    resizeMode="contain"
+                    style={[
+                      styles.icon,
+                      styles.iconOverlay,
+                      { tintColor: LOCK_RED },
+                      redTint,
+                    ]}
+                  />
+                </>
+              )}
             </Animated.View>
           ) : (
             <View style={styles.iconBox}>
-              <Image source={ICON_PLAY} style={styles.icon} resizeMode="contain" />
+              <Image
+                source={ICON_PLAY}
+                style={styles.icon}
+                resizeMode="contain"
+              />
             </View>
           )}
         </View>
@@ -211,7 +281,7 @@ export default function LevelButton({ label, locked, onPress }: Props) {
 const styles = StyleSheet.create({
   button: {
     width: '88%',
-    aspectRatio: 3.7, // largura/altura do PNG do botão; ajuste se esticar
+    aspectRatio: 3.7,
     alignSelf: 'center',
   },
   fill: {

@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import {
   errorMargin,
@@ -72,14 +73,26 @@ export const useGameStore = create<GameState>((set, get) => ({
   resolveNote: (noteIndex, result) => {
     const state = get();
 
-    // Só conta durante a partida e apenas uma vez por nota.
+    // Só conta durante a partida.
     if (state.status !== 'playing') return;
-    if (state.resolved[noteIndex] !== undefined) return;
+
+    // Impede índices inválidos e notas duplicadas.
+    if (
+      !Number.isInteger(noteIndex) ||
+      noteIndex < 0 ||
+      noteIndex >= state.totalNotes ||
+      state.resolved[noteIndex] !== undefined
+    ) {
+      return;
+    }
 
     const hits = state.hits + (result === 'hit' ? 1 : 0);
     const misses = state.misses + (result === 'miss' ? 1 : 0);
     const remaining = state.totalNotes - hits - misses;
-    const resolved = { ...state.resolved, [noteIndex]: result };
+    const resolved = {
+      ...state.resolved,
+      [noteIndex]: result,
+    };
 
     // Derrota antecipada: não é mais possível alcançar 51%.
     if (isEarlyDefeat(hits, remaining, state.totalNotes)) {
@@ -117,47 +130,47 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   // Fim da música: toda nota ainda sem resultado vira erro.
-failRemainingNotes: () => {
-  const state = get();
+  failRemainingNotes: () => {
+    const state = get();
 
-  if (state.status !== 'playing') return;
+    if (state.status !== 'playing') return;
 
-  const resolved = { ...state.resolved };
-  let misses = state.misses;
+    const resolved = { ...state.resolved };
+    let misses = state.misses;
 
-  for (let i = 0; i < state.totalNotes; i++) {
-    if (resolved[i] === undefined) {
-      resolved[i] = 'miss';
-      misses++;
+    for (let i = 0; i < state.totalNotes; i++) {
+      if (resolved[i] === undefined) {
+        resolved[i] = 'miss';
+        misses++;
+      }
     }
-  }
 
-  const stars = starsFor(state.hits, state.totalNotes);
+    const stars = starsFor(state.hits, state.totalNotes);
 
-  if (isEarlyDefeat(state.hits, 0, state.totalNotes) || stars === 0) {
+    // Se não alcançou a pontuação mínima, é derrota.
+    if (stars === 0) {
+      set({
+        resolved,
+        misses,
+        status: 'finished',
+        pausedFrom: null,
+        outcome: 'lost',
+        stars: 0,
+      });
+      return;
+    }
+
+    useProgressStore.getState().setStars(state.levelId, stars);
+
     set({
       resolved,
       misses,
       status: 'finished',
       pausedFrom: null,
-      outcome: 'lost',
-      stars: 0,
+      outcome: stars === 3 ? 'perfect' : 'completed',
+      stars,
     });
-
-    return;
-  }
-
-  useProgressStore.getState().setStars(state.levelId, stars);
-
-  set({
-    resolved,
-    misses,
-    status: 'finished',
-    pausedFrom: null,
-    outcome: stars === 3 ? 'perfect' : 'completed',
-    stars,
-  });
-},
+  },
 
   // Pausa tanto a contagem quanto a música.
   pause: () => {
@@ -171,7 +184,7 @@ failRemainingNotes: () => {
     }
   },
 
-  // Retoma exatamente o estado que estava antes da pausa.
+  // Retoma exatamente o estado anterior à pausa.
   resume: () => {
     const pausedFrom = get().pausedFrom;
 

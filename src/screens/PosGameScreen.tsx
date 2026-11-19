@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import {
@@ -21,27 +22,31 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import AnimatedBackground from '../components/AnimatedBackground';
-import { LEVELS } from '../game/levels';
-import { hitPercent, missPercent, unlocksNextLevel } from '../game/scoring';
+import { isLevelImplemented } from '../game/levels';
+import {
+  hitPercent,
+  missPercent,
+  unlocksNextLevel,
+} from '../game/scoring';
 import { useGameStore } from '../store/gameStore';
 import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Result'>;
 
-// Tamanho do mockup: todas as medidas abaixo estão nesse espaço
 const DESIGN_W = 463;
 const DESIGN_H = 1037;
 
 const STAR = require('../../assets/images/star.png');
 
-// Proporção real da imagem da estrela 67 (largura / altura)
 const STAR_67 = require('../../assets/images/67star.png');
-const STAR_67_SOURCE = Image.resolveAssetSource(STAR_67) ?? { width: 1, height: 1 };
+const STAR_67_SOURCE = Image.resolveAssetSource(STAR_67) ?? {
+  width: 1,
+  height: 1,
+};
 const STAR_67_WIDTH = STAR_67_SOURCE.width ?? 1;
 const STAR_67_HEIGHT = STAR_67_SOURCE.height ?? 1;
 const STAR_67_ASPECT = STAR_67_WIDTH / STAR_67_HEIGHT;
 
-// Posição e tamanho das 3 estrelas pequenas (esquerda, centro, direita)
 const SMALL_STARS = [
   { x: 104, y: 128, size: 84 },
   { x: 191, y: 78, size: 98 },
@@ -52,7 +57,6 @@ function formatPercent(value: number) {
   return Number.isInteger(value) ? `${value}%` : `${value.toFixed(1)}%`;
 }
 
-// Faz o elemento "pular" para dentro da tela
 function PopIn({
   delay,
   enabled,
@@ -68,7 +72,10 @@ function PopIn({
 
   useEffect(() => {
     if (enabled) {
-      progress.value = withDelay(delay, withSpring(1, { damping: 9, stiffness: 140 }));
+      progress.value = withDelay(
+        delay,
+        withSpring(1, { damping: 9, stiffness: 140 })
+      );
     }
   }, []);
 
@@ -92,7 +99,7 @@ export default function PosGameScreen({ navigation, route }: Props) {
   const storeStars = useGameStore((s) => s.stars);
   const storeOutcome = useGameStore((s) => s.outcome);
 
-  // Só usa os dados se forem da fase que foi jogada; senão, tudo zerado
+  // Só utiliza os dados se forem da fase que foi jogada.
   const hasData = playedLevelId === levelId;
   const hits = hasData ? storeHits : 0;
   const misses = hasData ? storeMisses : 0;
@@ -102,18 +109,21 @@ export default function PosGameScreen({ navigation, route }: Props) {
 
   const hitsPct = hitPercent(hits, totalNotes);
   const missesPct = missPercent(misses, totalNotes);
-  const accuracyPct = hitsPct; // acertos / total de notas
+  const accuracyPct = hitsPct;
   const isPerfect = outcome === 'perfect';
-  const canGoNext = unlocksNextLevel(stars) && levelId < LEVELS.length;
 
-  // Escala: o mockup inteiro tem que caber na área visível
+  // A próxima fase precisa existir e estar desbloqueada.
+  const nextLevelId = levelId + 1;
+  const nextLevelImplemented = isLevelImplemented(nextLevelId);
+  const canGoNext =
+    nextLevelImplemented && unlocksNextLevel(stars);
+
   const availableHeight = height - insets.top - insets.bottom;
   const scale = Math.min(width / DESIGN_W, availableHeight / DESIGN_H);
   const u = (n: number) => n * scale;
   const offsetX = (width - u(DESIGN_W)) / 2;
   const offsetY = insets.top + (availableHeight - u(DESIGN_H)) / 2;
 
-  // Caixa de texto centralizada em (cx, cy), nas medidas do mockup
   const box = (cx: number, cy: number, w: number, h: number) => ({
     position: 'absolute' as const,
     left: u(cx - w / 2),
@@ -125,10 +135,21 @@ export default function PosGameScreen({ navigation, route }: Props) {
     includeFontPadding: false,
   });
 
-  const stateLabel = outcome === 'lost' ? 'FASE PERDIDA' : 'FASE CONCLUÍDA';
+  const stateLabel =
+    outcome === 'lost' ? 'FASE PERDIDA' : 'FASE CONCLUÍDA';
 
   const goNext = () => {
-    if (canGoNext) navigation.replace('Game', { levelId: levelId + 1 });
+    if (!canGoNext) return;
+
+    navigation.replace('Game', { levelId: nextLevelId });
+  };
+
+  const replayLevel = () => {
+    navigation.replace('Game', { levelId });
+  };
+
+  const goToLevelList = () => {
+    navigation.navigate('LevelsList');
   };
 
   return (
@@ -161,6 +182,7 @@ export default function PosGameScreen({ navigation, route }: Props) {
         {/* Três estrelas pequenas */}
         {SMALL_STARS.map((star, i) => {
           const earned = stars > i;
+
           return (
             <PopIn
               key={i}
@@ -187,7 +209,7 @@ export default function PosGameScreen({ navigation, route }: Props) {
           );
         })}
 
-        {/* Estrela "67": só com 100% de acertos */}
+        {/* Estrela 67: só com 100% de acertos */}
         {isPerfect ? (
           <PopIn
             enabled
@@ -213,30 +235,31 @@ export default function PosGameScreen({ navigation, route }: Props) {
               styles.stateLabel,
               {
                 fontSize: u(34),
-                color: outcome === 'lost' ? colors.resultRed : colors.starYellow,
+                color:
+                  outcome === 'lost'
+                    ? colors.resultRed
+                    : colors.starYellow,
               },
             ]}
           >
             {stateLabel}
           </Text>
         )}
+
+
         {isPerfect && (
           <>
-            <Text style={[box(106, 349, 80, 30), styles.sideText, { fontSize: u(24) }]}>
-              SIX
-            </Text>
-            <Text style={[box(365, 349, 90, 30), styles.sideText, { fontSize: u(24) }]}>
-              SEVEN
-            </Text>
-            <Text style={[box(240, 330, 200, 80), styles.bigNumber, { fontSize: u(66) }]}>
-              67
-            </Text>
-          </>
-        )}
 
-        <Text style={[box(237, 452, 200, 30), styles.levelLabel, { fontSize: u(22) }]}>
+        <Text
+          style={[
+            box(237, 452, 200, 30),
+            styles.levelLabel,
+            { fontSize: u(22) },
+          ]}
+        >
           LEVEL {levelId}
         </Text>
+
 
         {/* Painel: acertos, erros e acurácia */}
         <View
@@ -252,10 +275,29 @@ export default function PosGameScreen({ navigation, route }: Props) {
             backgroundColor: colors.resultPanel,
           }}
         />
+
         {[
-          { label: 'ACERTOS', value: hitsPct, color: colors.resultGreen, line: colors.resultLine, top: 538 },
-          { label: 'ERROS', value: missesPct, color: colors.resultRed, line: colors.resultLineMuted, top: 593 },
-          { label: 'ACURÁCIA', value: accuracyPct, color: colors.resultGreen, line: colors.resultLine, top: 648 },
+          {
+            label: 'ACERTOS',
+            value: hitsPct,
+            color: colors.resultGreen,
+            line: colors.resultLine,
+            top: 538,
+          },
+          {
+            label: 'ERROS',
+            value: missesPct,
+            color: colors.resultRed,
+            line: colors.resultLineMuted,
+            top: 593,
+          },
+          {
+            label: 'ACURÁCIA',
+            value: accuracyPct,
+            color: colors.resultGreen,
+            line: colors.resultLine,
+            top: 648,
+          },
         ].map((row) => (
           <View
             key={row.label}
@@ -273,7 +315,10 @@ export default function PosGameScreen({ navigation, route }: Props) {
               borderBottomColor: row.line,
             }}
           >
-            <Text style={{ color: colors.resultLabel, fontSize: u(21) }}>{row.label}</Text>
+            <Text style={{ color: colors.resultLabel, fontSize: u(21) }}>
+              {row.label}
+            </Text>
+
             <Text style={{ color: row.color, fontSize: u(21) }}>
               {formatPercent(row.value)}
             </Text>
@@ -292,47 +337,131 @@ export default function PosGameScreen({ navigation, route }: Props) {
           }}
           resizeMode="stretch"
         />
-        <Text style={[box(233, 826, 300, 26), styles.notesLabel, { fontSize: u(19) }]}>
+
+        <Text
+          style={[
+            box(233, 826, 300, 26),
+            styles.notesLabel,
+            { fontSize: u(19) },
+          ]}
+        >
           NOTAS ACERTADAS
         </Text>
-        <Text style={[box(238, 882, 300, 74), styles.notesNumber, { fontSize: u(64) }]}>
+
+        <Text
+          style={[
+            box(238, 882, 300, 74),
+            styles.notesNumber,
+            { fontSize: u(64) },
+          ]}
+        >
           {hits}
         </Text>
 
         {/* Navegação */}
         <Pressable
-          onPress={() => navigation.navigate('LevelsList')}
-          onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+          onPress={goToLevelList}
+          onPressIn={() =>
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+          }
           hitSlop={12}
           style={({ pressed }) => [
             styles.linkButton,
-            { left: u(48), top: u(944), height: u(40), gap: u(6) },
+            {
+              left: u(20),
+              top: u(944),
+              height: u(40),
+              gap: u(4),
+            },
             pressed && styles.linkPressed,
           ]}
         >
-          <Feather name="arrow-left" size={u(38)} color={colors.backArrow} />
-          <Text style={[styles.linkText, { fontSize: Math.max(11, u(12)) }]}>
+          <Feather
+            name="arrow-left"
+            size={u(30)}
+            color={colors.backArrow}
+          />
+          <Text
+            style={[
+              styles.linkText,
+              { fontSize: Math.max(10, u(11)) },
+            ]}
+          >
             LEVEL LIST
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={replayLevel}
+          onPressIn={() =>
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+          }
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.linkButton,
+            {
+              left: '50%',
+              top: u(944),
+              height: u(40),
+              gap: u(4),
+              transform: [{ translateX: u(-43) }],
+            },
+            pressed && styles.linkPressed,
+          ]}
+        >
+          <Feather
+            name="refresh-cw"
+            size={u(25)}
+            color={colors.backArrow}
+          />
+          <Text
+            style={[
+              styles.linkText,
+              { fontSize: Math.max(10, u(11)) },
+            ]}
+          >
+            REPLAY
           </Text>
         </Pressable>
 
         <Pressable
           disabled={!canGoNext}
           onPress={goNext}
-          onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+          onPressIn={() =>
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+          }
           hitSlop={12}
           style={({ pressed }) => [
             styles.linkButton,
-            { right: u(DESIGN_W - 414), top: u(944), height: u(40), gap: u(6) },
+            {
+              right: u(20),
+              top: u(944),
+              height: u(40),
+              gap: u(4),
+            },
             !canGoNext && styles.linkDisabled,
             pressed && styles.linkPressed,
           ]}
         >
-          <Text style={[styles.linkText, { fontSize: Math.max(11, u(12)) }]}>
-            NEXT LEVEL
+          <Text
+            style={[
+              styles.linkText,
+              { fontSize: Math.max(10, u(11)) },
+            ]}
+          >
+            {nextLevelImplemented ? 'NEXT LEVEL' : 'EM BREVE'}
           </Text>
-          <Feather name="arrow-right" size={u(38)} color={colors.backArrow} />
+
+          {nextLevelImplemented && (
+            <Feather
+              name="arrow-right"
+              size={u(30)}
+              color={colors.backArrow}
+            />
+          )}
         </Pressable>
+          </>
+        )}
       </View>
     </View>
   );

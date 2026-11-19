@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+
+import { useEffect, useRef, useState } from 'react';
+import { useAudioPlayer } from 'expo-audio';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -13,11 +15,20 @@ import type { RootStackParamList } from '../navigation/types';
 import MenuButton from '../components/MenuButton';
 import AnimatedBackground from '../components/AnimatedBackground';
 import { colors } from '../theme/colors';
+import { useProgressStore } from '../store/progressStore';
+import {
+  getFirstAvailableLevel,
+  isLevelImplemented,
+} from '../game/levels';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 export default function MenuScreen({ navigation }: Props) {
   const [creditsVisible, setCreditsVisible] = useState(false);
+
+  const lastPlayedLevel = useProgressStore(
+    (state) => state.lastPlayedLevel
+  );
 
   const breathe = useSharedValue(0);
   const pulse = useSharedValue(0);
@@ -35,15 +46,47 @@ export default function MenuScreen({ navigation }: Props) {
     );
   }, []);
 
-  // bordas neon "respirando"
+  const buttonSoundPlayer = useAudioPlayer(
+    require('../../assets/sounds/som_botoes_menu.mp3'),
+  );
+
+  const isNavigating = useRef(false);
+
+  const playButtonSound = async () => {
+    try {
+      await buttonSoundPlayer.seekTo(0);
+      buttonSoundPlayer.play();
+    } catch (error) {
+      console.warn('Erro ao reproduzir som do botão:', error);
+    }
+  };
+  // Bordas neon "respirando".
   const frameStyle = useAnimatedStyle(() => ({
     opacity: 0.55 + breathe.value * 0.45,
   }));
 
-  // logo pulsando de leve
+  // Logo pulsando de leve.
   const logoStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 + pulse.value * 0.03 }],
   }));
+
+  const handlePlay = async () => {
+    if (isNavigating.current) return;
+
+    isNavigating.current = true;
+
+    const levelId =
+      lastPlayedLevel !== null &&
+        isLevelImplemented(lastPlayedLevel)
+        ? lastPlayedLevel
+        : getFirstAvailableLevel();
+
+    await playButtonSound();
+
+    setTimeout(() => {
+      navigation.navigate('Game', { levelId });
+    }, 500);
+  };
 
   return (
     <View style={styles.root}>
@@ -87,7 +130,7 @@ export default function MenuScreen({ navigation }: Props) {
               glowColor={colors.cyan}
               background={require('../../assets/images/botao-menu-azul.png')}
               icon={require('../../assets/images/icon-playmenu.png')}
-              onPress={() => navigation.navigate('Game', { levelId: 1 })}
+              onPress={handlePlay}
             />
             <MenuButton
               label="LEVELS LIST"
@@ -96,7 +139,10 @@ export default function MenuScreen({ navigation }: Props) {
               glowColor={colors.cyan}
               background={require('../../assets/images/botao-menu-azul.png')}
               icon={require('../../assets/images/icon-list-menu.png')}
-              onPress={() => navigation.navigate('LevelsList')}
+              onPress={async () => {
+                await playButtonSound();
+                navigation.navigate('LevelsList');
+              }}
             />
             <MenuButton
               label="CREDITS"
@@ -104,7 +150,10 @@ export default function MenuScreen({ navigation }: Props) {
               textColor={colors.purpleText}
               glowColor={colors.purpleText}
               background={require('../../assets/images/botao-menu-roxo.png')}
-              onPress={() => setCreditsVisible(true)}
+              onPress={() => {
+                void playButtonSound();
+                setCreditsVisible(true);
+              }}
             />
           </View>
         </View>
@@ -116,7 +165,13 @@ export default function MenuScreen({ navigation }: Props) {
         animationType="fade"
         onRequestClose={() => setCreditsVisible(false)}
       >
-        <Pressable style={styles.overlay} onPress={() => setCreditsVisible(false)}>
+        <Pressable
+          style={styles.overlay}
+          onPress={() => {
+            void playButtonSound();
+            setCreditsVisible(false);
+          }}
+        >
           <View style={styles.creditsCard}>
             <Text style={styles.creditsTitle}>CREDITS</Text>
             <Text style={styles.creditsText}>UNWAKE STUDIO</Text>

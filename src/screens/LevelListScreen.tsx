@@ -1,12 +1,20 @@
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useAudioPlayer } from 'expo-audio';
+
 import type { RootStackParamList } from '../navigation/types';
 import AnimatedBackground from '../components/AnimatedBackground';
 import LevelButton from '../components/LevelButton';
-import { LEVELS } from '../game/levels';
+import { LEVELS, isLevelImplemented } from '../game/levels';
 import { isLevelUnlocked, useProgressStore } from '../store/progressStore';
 import { colors } from '../theme/colors';
 
@@ -18,59 +26,96 @@ export default function LevelListScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const stars = useProgressStore((state) => state.stars);
 
+  // Player único para os botões da lista.
+  const buttonSoundPlayer = useAudioPlayer(
+    require('../../assets/sounds/som_botoes_menu.mp3'),
+  );
+
+  const playButtonSound = async () => {
+    try {
+      await buttonSoundPlayer.seekTo(0);
+      buttonSoundPlayer.play();
+    } catch (error) {
+      console.warn('Erro ao reproduzir som do botão:', error);
+    }
+  };
+
+  const handleBack = async () => {
+    await playButtonSound();
+    navigation.navigate('Home');
+  };
+
   return (
     <View style={styles.root}>
       <AnimatedBackground />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
         contentContainerStyle={[
-          styles.list,
+          styles.scrollContent,
           {
-            paddingTop: insets.top + HEADER_HEIGHT + 24,
+            paddingTop: insets.top + HEADER_HEIGHT + 16,
             paddingBottom: insets.bottom + 24,
           },
         ]}
+        showsVerticalScrollIndicator={false}
       >
-        {LEVELS.map((level) => (
-          <LevelButton
-            key={level.id}
-            label={`LEVEL ${level.id}`}
-            locked={!isLevelUnlocked(stars, level.id)}
-            onPress={() => navigation.navigate('Game', { levelId: level.id })}
-          />
-        ))}
+        <View style={styles.levelsContainer}>
+          {LEVELS.map((level) => {
+            const implemented = isLevelImplemented(level.id);
+            const unlocked = isLevelUnlocked(stars, level.id);
+
+            return (
+              <LevelButton
+                key={level.id}
+                label={implemented ? `LEVEL ${level.id}` : 'EM BREVE'}
+                locked={implemented && !unlocked}
+                comingSoon={!implemented}
+                onPress={async () => {
+                  if (!implemented || !unlocked) return;
+
+                  await playButtonSound();
+
+                  navigation.navigate('Game', {
+                    levelId: level.id,
+                  });
+                }}
+              />
+            );
+          })}
+        </View>
       </ScrollView>
 
-      {/* Cabeçalho fixo por cima da lista */}
-      <View style={[styles.header, { height: insets.top + HEADER_HEIGHT }]}>
-        <Image
-          source={require('../../assets/images/headline.png')}
-          style={styles.headerBackground}
-          resizeMode="stretch"
-        />
-
+      {/* Cabeçalho */}
+      <View
+        style={[
+          styles.header,
+          {
+            height: HEADER_HEIGHT + insets.top,
+            paddingTop: insets.top,
+          },
+        ]}
+      >
         <Pressable
-  onPress={() =>
-    navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home')
-  }
-  onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-  hitSlop={12}
-  style={({ pressed }) => [
-    styles.back,
-    { top: insets.top },
-    pressed && styles.backPressed,
-  ]}
->
-  <Feather
-    name="arrow-left"
-    size={30}
-    color={colors.backArrow}
-    style={styles.backIcon}
-  />
-</Pressable>
+          onPress={handleBack}
+          onPressIn={() =>
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+          }
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.back,
+            { top: insets.top },
+            pressed && styles.backPressed,
+          ]}
+        >
+          <Feather
+            name="arrow-left"
+            size={30}
+            color={colors.backArrow}
+            style={styles.backIcon}
+          />
+        </Pressable>
 
-        <Text style={[styles.title, { marginTop: insets.top }]}>LEVELS LIST</Text>
+        <Text style={styles.title}>LEVELS LIST</Text>
       </View>
     </View>
   );
@@ -81,8 +126,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  list: {
-    gap: 14,
+  scrollContent: {
+    flexGrow: 1,
+  },
+  levelsContainer: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 18,
   },
   header: {
     position: 'absolute',
@@ -92,18 +142,9 @@ const styles = StyleSheet.create({
     zIndex: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.headerBackground,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.headerLine,
-  },
-  headerBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
   },
   back: {
     position: 'absolute',
