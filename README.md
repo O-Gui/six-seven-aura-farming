@@ -1,3 +1,7 @@
+# 🎮 Gameplay
+
+![Gameplay do Six Seven](./assets/images/auraGif.gif)
+
 # Six Seven: Aura Farming
 
 Six Seven: Aura Farming é um jogo mobile de ritmo com estética cyberpunk e uma temática inspirada na cultura dos memes e na obsessão por farmar aura. Em duas pistas, o jogador precisa acertar as notas no ritmo da música, testar seus reflexos e superar cada desafio. O objetivo é alcançar pelo menos 51% de acertos para sobreviver à fase, conquistar estrelas para desbloquear novos níveis e, finalmente, atingir os lendários 100% de precisão para receber o selo SIX SEVEN, símbolo máximo de um verdadeiro farmador de aura.
