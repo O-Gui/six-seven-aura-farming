@@ -1,6 +1,6 @@
-
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { BUTTON_SOUND } from '../audio/buttonSound';
 import { useEffect, useRef, useState } from 'react';
-import { useAudioPlayer } from 'expo-audio';
 import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -46,9 +46,8 @@ export default function MenuScreen({ navigation }: Props) {
     );
   }, []);
 
-  const buttonSoundPlayer = useAudioPlayer(
-    require('../../assets/sounds/som_botoes_menu.mp3'),
-  );
+const buttonSoundPlayer = useAudioPlayer(BUTTON_SOUND);
+const audioStatus = useAudioPlayerStatus(buttonSoundPlayer);
 
   const isNavigating = useRef(false);
 
@@ -175,6 +174,7 @@ export default function MenuScreen({ navigation }: Props) {
           <View style={styles.creditsCard}>
             <Text style={styles.creditsTitle}>CREDITS</Text>
             <Text style={styles.creditsText}>UNWAKE STUDIO</Text>
+            <Text style={styles.creditsText}>POR GUILHERME BASILIO</Text>
             <Text style={styles.creditsHint}>Toque para fechar</Text>
           </View>
         </Pressable>

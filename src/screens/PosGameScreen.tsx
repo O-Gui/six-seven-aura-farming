@@ -246,10 +246,7 @@ export default function PosGameScreen({ navigation, route }: Props) {
           </Text>
         )}
 
-
-        {isPerfect && (
-          <>
-
+        {/* RESULTADOS: agora aparecem em qualquer resultado */}
         <Text
           style={[
             box(237, 452, 200, 30),
@@ -259,7 +256,6 @@ export default function PosGameScreen({ navigation, route }: Props) {
         >
           LEVEL {levelId}
         </Text>
-
 
         {/* Painel: acertos, erros e acurácia */}
         <View
@@ -460,8 +456,6 @@ export default function PosGameScreen({ navigation, route }: Props) {
             />
           )}
         </Pressable>
-          </>
-        )}
       </View>
     </View>
   );

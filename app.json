@@ -1,22 +1,28 @@
+
 {
   "expo": {
     "name": "six-seven-aura-farming",
     "slug": "six-seven-aura-farming",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/icon_67aurafaming.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/images/icon_67aurafaming.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
+      "package": "com.guilhermebasilio.sixsevenaurafarming"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -24,7 +30,21 @@
     "plugins": [
       "expo-status-bar",
       "expo-font",
-      "expo-audio"
-    ]
+      "expo-audio",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash_screen_aurafarming.png",
+          "imageWidth": 420,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "969335da-665a-4699-b054-ca80b2a96003"
+      }
+    }
   }
 }

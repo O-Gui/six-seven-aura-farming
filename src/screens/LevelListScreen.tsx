@@ -1,3 +1,4 @@
+import { BUTTON_SOUND } from '../audio/buttonSound';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -27,10 +28,7 @@ export default function LevelListScreen({ navigation }: Props) {
   const stars = useProgressStore((state) => state.stars);
 
   // Player único para os botões da lista.
-  const buttonSoundPlayer = useAudioPlayer(
-    require('../../assets/sounds/som_botoes_menu.mp3'),
-  );
-
+const buttonSoundPlayer = useAudioPlayer(BUTTON_SOUND);
   const playButtonSound = async () => {
     try {
       await buttonSoundPlayer.seekTo(0);
