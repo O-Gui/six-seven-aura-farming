@@ -13,4 +13,10 @@ A UNWAKE Studio é um estúdio independente recém-criado, idealizado para desen
 ### https://www.figma.com/design/HjVuCk0ACNbUFfKFO1lHem/six-seven-aura-farming?node-id=0-1&p=f&t=I2GIxsmbN516s3fa-0
 
 ## BAIXE A BUILD NATIVA PARA MOBILE
-https://github.com/O-Gui/six-seven-aura-farming/releases/tag/v1.0.0
+1. acesse esse link baixo pelo seu celular ou tablet
+2. clique nos 3 pontinho ... em ativos e baixe
+3. clique em Baixar mesmo assim
+4. clique em Mais detalhes
+5. clique em Intalar assim mesmo
+
+### https://github.com/O-Gui/six-seven-aura-farming/releases/tag/v1.0.0
