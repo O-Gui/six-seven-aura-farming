@@ -17,7 +17,7 @@ export default function App() {
       SplashScreen.hideAsync().catch((error) => {
         console.warn('Erro ao esconder a Splash Screen:', error);
       });
-    }, 3000);
+    }, 1000);
 
     if (Platform.OS === 'android') {
       try {
