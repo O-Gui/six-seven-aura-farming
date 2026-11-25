@@ -1,0 +1,778 @@
+{
+  "id": "level-2",
+  "title": "Level 2",
+  "bpm": 66.6,
+  "approachTimeMs": 1100,
+  "notes": [
+    {
+      "id": "note-1",
+      "timeMs": 0,
+      "lane": "right"
+    },
+    {
+      "id": "note-2",
+      "timeMs": 300,
+      "lane": "right"
+    },
+    {
+      "id": "note-3",
+      "timeMs": 633,
+      "lane": "left"
+    },
+    {
+      "id": "note-4",
+      "timeMs": 933,
+      "lane": "left"
+    },
+    {
+      "id": "note-5",
+      "timeMs": 1233,
+      "lane": "right"
+    },
+    {
+      "id": "note-6",
+      "timeMs": 2400,
+      "lane": "left"
+    },
+    {
+      "id": "note-7",
+      "timeMs": 2700,
+      "lane": "left"
+    },
+    {
+      "id": "note-8",
+      "timeMs": 3033,
+      "lane": "right"
+    },
+    {
+      "id": "note-9",
+      "timeMs": 3333,
+      "lane": "right"
+    },
+    {
+      "id": "note-10",
+      "timeMs": 3633,
+      "lane": "left"
+    },
+    {
+      "id": "note-11",
+      "timeMs": 4833,
+      "lane": "right"
+    },
+    {
+      "id": "note-12",
+      "timeMs": 5133,
+      "lane": "right"
+    },
+    {
+      "id": "note-13",
+      "timeMs": 5467,
+      "lane": "left"
+    },
+    {
+      "id": "note-14",
+      "timeMs": 5733,
+      "lane": "right"
+    },
+    {
+      "id": "note-15",
+      "timeMs": 5867,
+      "lane": "left"
+    },
+    {
+      "id": "note-16",
+      "timeMs": 6033,
+      "lane": "right"
+    },
+    {
+      "id": "note-17",
+      "timeMs": 7233,
+      "lane": "left"
+    },
+    {
+      "id": "note-18",
+      "timeMs": 7533,
+      "lane": "left"
+    },
+    {
+      "id": "note-19",
+      "timeMs": 7867,
+      "lane": "right"
+    },
+    {
+      "id": "note-20",
+      "timeMs": 8133,
+      "lane": "left"
+    },
+    {
+      "id": "note-21",
+      "timeMs": 8267,
+      "lane": "right"
+    },
+    {
+      "id": "note-22",
+      "timeMs": 8433,
+      "lane": "left"
+    },
+    {
+      "id": "note-23",
+      "timeMs": 9633,
+      "lane": "right"
+    },
+    {
+      "id": "note-24",
+      "timeMs": 9933,
+      "lane": "right"
+    },
+    {
+      "id": "note-25",
+      "timeMs": 10267,
+      "lane": "left"
+    },
+    {
+      "id": "note-26",
+      "timeMs": 10567,
+      "lane": "left"
+    },
+    {
+      "id": "note-27",
+      "timeMs": 10867,
+      "lane": "right"
+    },
+    {
+      "id": "note-28",
+      "timeMs": 12033,
+      "lane": "left"
+    },
+    {
+      "id": "note-29",
+      "timeMs": 12333,
+      "lane": "left"
+    },
+    {
+      "id": "note-30",
+      "timeMs": 12667,
+      "lane": "right"
+    },
+    {
+      "id": "note-31",
+      "timeMs": 12967,
+      "lane": "right"
+    },
+    {
+      "id": "note-32",
+      "timeMs": 13267,
+      "lane": "left"
+    },
+    {
+      "id": "note-33",
+      "timeMs": 14467,
+      "lane": "right"
+    },
+    {
+      "id": "note-34",
+      "timeMs": 14767,
+      "lane": "right"
+    },
+    {
+      "id": "note-35",
+      "timeMs": 15100,
+      "lane": "left"
+    },
+    {
+      "id": "note-36",
+      "timeMs": 15367,
+      "lane": "right"
+    },
+    {
+      "id": "note-37",
+      "timeMs": 15500,
+      "lane": "left"
+    },
+    {
+      "id": "note-38",
+      "timeMs": 15667,
+      "lane": "right"
+    },
+    {
+      "id": "note-39",
+      "timeMs": 16867,
+      "lane": "left"
+    },
+    {
+      "id": "note-40",
+      "timeMs": 17167,
+      "lane": "left"
+    },
+    {
+      "id": "note-41",
+      "timeMs": 17500,
+      "lane": "right"
+    },
+    {
+      "id": "note-42",
+      "timeMs": 17767,
+      "lane": "left"
+    },
+    {
+      "id": "note-43",
+      "timeMs": 17900,
+      "lane": "right"
+    },
+    {
+      "id": "note-44",
+      "timeMs": 18067,
+      "lane": "left"
+    },
+    {
+      "id": "note-45",
+      "timeMs": 19233,
+      "lane": "right"
+    },
+    {
+      "id": "note-46",
+      "timeMs": 19533,
+      "lane": "right"
+    },
+    {
+      "id": "note-47",
+      "timeMs": 19867,
+      "lane": "left"
+    },
+    {
+      "id": "note-48",
+      "timeMs": 20167,
+      "lane": "left"
+    },
+    {
+      "id": "note-49",
+      "timeMs": 20467,
+      "lane": "right"
+    },
+    {
+      "id": "note-50",
+      "timeMs": 21633,
+      "lane": "left"
+    },
+    {
+      "id": "note-51",
+      "timeMs": 21933,
+      "lane": "left"
+    },
+    {
+      "id": "note-52",
+      "timeMs": 22267,
+      "lane": "right"
+    },
+    {
+      "id": "note-53",
+      "timeMs": 22567,
+      "lane": "right"
+    },
+    {
+      "id": "note-54",
+      "timeMs": 22867,
+      "lane": "left"
+    },
+    {
+      "id": "note-55",
+      "timeMs": 24067,
+      "lane": "right"
+    },
+    {
+      "id": "note-56",
+      "timeMs": 24367,
+      "lane": "right"
+    },
+    {
+      "id": "note-57",
+      "timeMs": 24700,
+      "lane": "left"
+    },
+    {
+      "id": "note-58",
+      "timeMs": 24967,
+      "lane": "right"
+    },
+    {
+      "id": "note-59",
+      "timeMs": 25100,
+      "lane": "left"
+    },
+    {
+      "id": "note-60",
+      "timeMs": 25267,
+      "lane": "right"
+    },
+    {
+      "id": "note-61",
+      "timeMs": 26467,
+      "lane": "left"
+    },
+    {
+      "id": "note-62",
+      "timeMs": 26767,
+      "lane": "left"
+    },
+    {
+      "id": "note-63",
+      "timeMs": 27100,
+      "lane": "right"
+    },
+    {
+      "id": "note-64",
+      "timeMs": 27367,
+      "lane": "left"
+    },
+    {
+      "id": "note-65",
+      "timeMs": 27500,
+      "lane": "right"
+    },
+    {
+      "id": "note-66",
+      "timeMs": 27667,
+      "lane": "left"
+    },
+    {
+      "id": "note-67",
+      "timeMs": 28867,
+      "lane": "right"
+    },
+    {
+      "id": "note-68",
+      "timeMs": 29167,
+      "lane": "right"
+    },
+    {
+      "id": "note-69",
+      "timeMs": 29500,
+      "lane": "left"
+    },
+    {
+      "id": "note-70",
+      "timeMs": 29800,
+      "lane": "left"
+    },
+    {
+      "id": "note-71",
+      "timeMs": 30100,
+      "lane": "right"
+    },
+    {
+      "id": "note-72",
+      "timeMs": 31267,
+      "lane": "left"
+    },
+    {
+      "id": "note-73",
+      "timeMs": 31567,
+      "lane": "left"
+    },
+    {
+      "id": "note-74",
+      "timeMs": 31900,
+      "lane": "right"
+    },
+    {
+      "id": "note-75",
+      "timeMs": 32200,
+      "lane": "right"
+    },
+    {
+      "id": "note-76",
+      "timeMs": 32500,
+      "lane": "left"
+    },
+    {
+      "id": "note-77",
+      "timeMs": 33700,
+      "lane": "right"
+    },
+    {
+      "id": "note-78",
+      "timeMs": 34000,
+      "lane": "right"
+    },
+    {
+      "id": "note-79",
+      "timeMs": 34333,
+      "lane": "left"
+    },
+    {
+      "id": "note-80",
+      "timeMs": 34600,
+      "lane": "right"
+    },
+    {
+      "id": "note-81",
+      "timeMs": 34733,
+      "lane": "left"
+    },
+    {
+      "id": "note-82",
+      "timeMs": 34900,
+      "lane": "right"
+    },
+    {
+      "id": "note-83",
+      "timeMs": 36100,
+      "lane": "left"
+    },
+    {
+      "id": "note-84",
+      "timeMs": 36400,
+      "lane": "left"
+    },
+    {
+      "id": "note-85",
+      "timeMs": 36733,
+      "lane": "right"
+    },
+    {
+      "id": "note-86",
+      "timeMs": 37000,
+      "lane": "left"
+    },
+    {
+      "id": "note-87",
+      "timeMs": 37133,
+      "lane": "right"
+    },
+    {
+      "id": "note-88",
+      "timeMs": 37300,
+      "lane": "left"
+    },
+    {
+      "id": "note-89",
+      "timeMs": 38467,
+      "lane": "right"
+    },
+    {
+      "id": "note-90",
+      "timeMs": 38767,
+      "lane": "right"
+    },
+    {
+      "id": "note-91",
+      "timeMs": 39100,
+      "lane": "left"
+    },
+    {
+      "id": "note-92",
+      "timeMs": 39400,
+      "lane": "left"
+    },
+    {
+      "id": "note-93",
+      "timeMs": 39700,
+      "lane": "right"
+    },
+    {
+      "id": "note-94",
+      "timeMs": 40867,
+      "lane": "left"
+    },
+    {
+      "id": "note-95",
+      "timeMs": 41167,
+      "lane": "left"
+    },
+    {
+      "id": "note-96",
+      "timeMs": 41500,
+      "lane": "right"
+    },
+    {
+      "id": "note-97",
+      "timeMs": 41800,
+      "lane": "right"
+    },
+    {
+      "id": "note-98",
+      "timeMs": 42100,
+      "lane": "left"
+    },
+    {
+      "id": "note-99",
+      "timeMs": 43300,
+      "lane": "right"
+    },
+    {
+      "id": "note-100",
+      "timeMs": 43600,
+      "lane": "right"
+    },
+    {
+      "id": "note-101",
+      "timeMs": 43933,
+      "lane": "left"
+    },
+    {
+      "id": "note-102",
+      "timeMs": 44200,
+      "lane": "right"
+    },
+    {
+      "id": "note-103",
+      "timeMs": 44333,
+      "lane": "left"
+    },
+    {
+      "id": "note-104",
+      "timeMs": 44500,
+      "lane": "right"
+    },
+    {
+      "id": "note-105",
+      "timeMs": 45700,
+      "lane": "left"
+    },
+    {
+      "id": "note-106",
+      "timeMs": 46000,
+      "lane": "left"
+    },
+    {
+      "id": "note-107",
+      "timeMs": 46333,
+      "lane": "right"
+    },
+    {
+      "id": "note-108",
+      "timeMs": 46600,
+      "lane": "left"
+    },
+    {
+      "id": "note-109",
+      "timeMs": 46733,
+      "lane": "right"
+    },
+    {
+      "id": "note-110",
+      "timeMs": 46900,
+      "lane": "left"
+    },
+    {
+      "id": "note-111",
+      "timeMs": 48100,
+      "lane": "right"
+    },
+    {
+      "id": "note-112",
+      "timeMs": 48400,
+      "lane": "right"
+    },
+    {
+      "id": "note-113",
+      "timeMs": 48733,
+      "lane": "left"
+    },
+    {
+      "id": "note-114",
+      "timeMs": 49033,
+      "lane": "left"
+    },
+    {
+      "id": "note-115",
+      "timeMs": 49333,
+      "lane": "right"
+    },
+    {
+      "id": "note-116",
+      "timeMs": 50500,
+      "lane": "left"
+    },
+    {
+      "id": "note-117",
+      "timeMs": 50800,
+      "lane": "left"
+    },
+    {
+      "id": "note-118",
+      "timeMs": 51133,
+      "lane": "right"
+    },
+    {
+      "id": "note-119",
+      "timeMs": 51433,
+      "lane": "right"
+    },
+    {
+      "id": "note-120",
+      "timeMs": 51733,
+      "lane": "left"
+    },
+    {
+      "id": "note-121",
+      "timeMs": 52933,
+      "lane": "right"
+    },
+    {
+      "id": "note-122",
+      "timeMs": 53233,
+      "lane": "right"
+    },
+    {
+      "id": "note-123",
+      "timeMs": 53567,
+      "lane": "left"
+    },
+    {
+      "id": "note-124",
+      "timeMs": 53833,
+      "lane": "right"
+    },
+    {
+      "id": "note-125",
+      "timeMs": 53967,
+      "lane": "left"
+    },
+    {
+      "id": "note-126",
+      "timeMs": 54133,
+      "lane": "right"
+    },
+    {
+      "id": "note-127",
+      "timeMs": 55333,
+      "lane": "left"
+    },
+    {
+      "id": "note-128",
+      "timeMs": 55633,
+      "lane": "left"
+    },
+    {
+      "id": "note-129",
+      "timeMs": 55967,
+      "lane": "right"
+    },
+    {
+      "id": "note-130",
+      "timeMs": 56233,
+      "lane": "left"
+    },
+    {
+      "id": "note-131",
+      "timeMs": 56367,
+      "lane": "right"
+    },
+    {
+      "id": "note-132",
+      "timeMs": 56533,
+      "lane": "left"
+    },
+    {
+      "id": "note-133",
+      "timeMs": 57700,
+      "lane": "right"
+    },
+    {
+      "id": "note-134",
+      "timeMs": 58000,
+      "lane": "right"
+    },
+    {
+      "id": "note-135",
+      "timeMs": 58333,
+      "lane": "left"
+    },
+    {
+      "id": "note-136",
+      "timeMs": 58633,
+      "lane": "left"
+    },
+    {
+      "id": "note-137",
+      "timeMs": 58933,
+      "lane": "right"
+    },
+    {
+      "id": "note-138",
+      "timeMs": 60100,
+      "lane": "left"
+    },
+    {
+      "id": "note-139",
+      "timeMs": 60400,
+      "lane": "left"
+    },
+    {
+      "id": "note-140",
+      "timeMs": 60733,
+      "lane": "right"
+    },
+    {
+      "id": "note-141",
+      "timeMs": 61033,
+      "lane": "right"
+    },
+    {
+      "id": "note-142",
+      "timeMs": 61333,
+      "lane": "left"
+    },
+    {
+      "id": "note-143",
+      "timeMs": 62533,
+      "lane": "right"
+    },
+    {
+      "id": "note-144",
+      "timeMs": 62833,
+      "lane": "right"
+    },
+    {
+      "id": "note-145",
+      "timeMs": 63167,
+      "lane": "left"
+    },
+    {
+      "id": "note-146",
+      "timeMs": 63433,
+      "lane": "right"
+    },
+    {
+      "id": "note-147",
+      "timeMs": 63567,
+      "lane": "left"
+    },
+    {
+      "id": "note-148",
+      "timeMs": 63733,
+      "lane": "right"
+    },
+    {
+      "id": "note-149",
+      "timeMs": 64933,
+      "lane": "left"
+    },
+    {
+      "id": "note-150",
+      "timeMs": 65233,
+      "lane": "left"
+    },
+    {
+      "id": "note-151",
+      "timeMs": 65567,
+      "lane": "right"
+    },
+    {
+      "id": "note-152",
+      "timeMs": 65833,
+      "lane": "left"
+    },
+    {
+      "id": "note-153",
+      "timeMs": 65967,
+      "lane": "right"
+    },
+    {
+      "id": "note-154",
+      "timeMs": 66133,
+      "lane": "left"
+    }
+  ]
+}

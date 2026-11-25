@@ -358,11 +358,13 @@ export default function GameScreen({ navigation, route }: Props) {
     );
   }, [beatmap]);
 
-  // Player da música principal.
-  const player = useAudioPlayer(
-    require('../../assets/music/Korobeiniki_funk.mp3'),
-    { updateInterval: 16 },
-  );
+ // Player da música conforme a fase.
+const player = useAudioPlayer(
+  levelId === 2
+    ? require('../../assets/music/level2.mp3')
+    : require('../../assets/music/Korobeiniki_funk.mp3'),
+  { updateInterval: 16 },
+);
 
   // Player exclusivo da contagem regressiva.
   const countdownPlayer = useAudioPlayer(

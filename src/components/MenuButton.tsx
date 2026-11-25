@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+
+import { Image, Pressable, StyleSheet, View, ViewStyle } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -16,6 +17,7 @@ type Props = {
   textColor: string;
   glowColor?: string;
   fontSize?: number;
+  buttonStyle?: ViewStyle;
   onPress: () => void;
 };
 
@@ -26,24 +28,38 @@ export default function MenuButton({
   textColor,
   glowColor = colors.cyan,
   fontSize = 24,
+  buttonStyle,
   onPress,
 }: Props) {
   const glow = useSharedValue(0);
 
-  const haloGlow = useAnimatedStyle(() => ({ opacity: glow.value * 0.1 }));
-  const outerGlow = useAnimatedStyle(() => ({ opacity: glow.value * 0.1 }));
-  const innerGlow = useAnimatedStyle(() => ({ opacity: glow.value * 0.1 }));
-  const whiteFlash = useAnimatedStyle(() => ({ opacity: glow.value * 0.1 }));
+  const haloGlow = useAnimatedStyle(() => ({
+    opacity: glow.value * 0.1,
+  }));
+
+  const outerGlow = useAnimatedStyle(() => ({
+    opacity: glow.value * 0.1,
+  }));
+
+  const innerGlow = useAnimatedStyle(() => ({
+    opacity: glow.value * 0.1,
+  }));
+
+  const whiteFlash = useAnimatedStyle(() => ({
+    opacity: glow.value * 0.1,
+  }));
+
   const body = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - glow.value * 0.03 }],
   }));
+
   const textGlow = useAnimatedStyle(() => ({
     textShadowRadius: glow.value * 10,
   }));
 
   return (
     <Pressable
-      style={styles.button}
+      style={[styles.button, buttonStyle]}
       onPress={onPress}
       onPressIn={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -57,17 +73,31 @@ export default function MenuButton({
       }}
     >
       <Animated.View style={[styles.fill, body]}>
-        <Image source={background} style={styles.fill} resizeMode="contain" />
+        <Image
+          source={background}
+          style={styles.fill}
+          resizeMode="contain"
+        />
 
-        {/* camadas de luz, da mais externa para a mais interna */}
+        {/* Camadas de luz, da mais externa para a mais interna */}
         <Animated.View
           pointerEvents="none"
-          style={[styles.halo, { backgroundColor: glowColor }, haloGlow]}
+          style={[
+            styles.halo,
+            { backgroundColor: glowColor },
+            haloGlow,
+          ]}
         />
+
         <Animated.View
           pointerEvents="none"
-          style={[styles.glowOuter, { backgroundColor: glowColor }, outerGlow]}
+          style={[
+            styles.glowOuter,
+            { backgroundColor: glowColor },
+            outerGlow,
+          ]}
         />
+
         <Animated.View
           pointerEvents="none"
           style={[
@@ -76,17 +106,33 @@ export default function MenuButton({
             innerGlow,
           ]}
         />
+
         <Animated.View
           pointerEvents="none"
-          style={[styles.glowInner, styles.white, whiteFlash]}
+          style={[
+            styles.glowInner,
+            styles.white,
+            whiteFlash,
+          ]}
         />
 
         <View style={styles.content}>
-          {icon && <Image source={icon} style={styles.icon} resizeMode="contain" />}
+          {icon && (
+            <Image
+              source={icon}
+              style={styles.icon}
+              resizeMode="contain"
+            />
+          )}
+
           <Animated.Text
             style={[
               styles.label,
-              { color: textColor, fontSize, textShadowColor: glowColor },
+              {
+                color: textColor,
+                fontSize,
+                textShadowColor: glowColor,
+              },
               textGlow,
             ]}
           >
@@ -103,6 +149,7 @@ const styles = StyleSheet.create({
     width: '56%',
     aspectRatio: 3.3,
   },
+
   fill: {
     position: 'absolute',
     top: 0,
@@ -112,6 +159,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+
   halo: {
     position: 'absolute',
     top: -4,
@@ -120,6 +168,7 @@ const styles = StyleSheet.create({
     right: -6,
     borderRadius: 999,
   },
+
   glowOuter: {
     position: 'absolute',
     top: '3%',
@@ -128,6 +177,7 @@ const styles = StyleSheet.create({
     right: 0,
     borderRadius: 999,
   },
+
   glowInner: {
     position: 'absolute',
     top: '8%',
@@ -137,10 +187,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 2,
   },
+
   white: {
     backgroundColor: '#FFFFFF',
     borderWidth: 0,
   },
+
   content: {
     flex: 1,
     flexDirection: 'row',
@@ -148,10 +200,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
+
   icon: {
     width: 24,
     height: 24,
   },
+
   label: {
     fontWeight: '600',
     letterSpacing: 1,

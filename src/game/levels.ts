@@ -1,4 +1,3 @@
-
 export type LevelInfo = {
   id: number;
   implemented: boolean;
@@ -8,7 +7,7 @@ export type LevelInfo = {
 // Apenas as fases implementadas podem ser iniciadas.
 export const LEVELS: LevelInfo[] = [
   { id: 1, implemented: true },
-  { id: 2, implemented: false },
+  { id: 2, implemented: true }, // Level 2 habilitada
   { id: 3, implemented: false },
   { id: 4, implemented: false },
   { id: 5, implemented: false },

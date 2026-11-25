@@ -58,6 +58,7 @@ export default function LevelButton({
 
   const glowColor = colors.levelUnlockedGlow;
   const isUnavailable = locked || comingSoon;
+
   const textColor = isUnavailable
     ? colors.levelLockedText
     : colors.levelUnlockedText;
@@ -74,19 +75,17 @@ export default function LevelButton({
     opacity: glow.value * 0.8,
   }));
 
+  // Tremor aplicado ao botão inteiro.
   const bodyStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 - glow.value * 0.03 }],
+    transform: [
+      { scale: 1 - glow.value * 0.03 },
+      { translateX: lockShake.value },
+      { rotate: `${lockShake.value * 1.5}deg` },
+    ],
   }));
 
   const textGlow = useAnimatedStyle(() => ({
     textShadowRadius: glow.value * 18,
-  }));
-
-  const lockShakeStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: lockShake.value },
-      { rotate: `${lockShake.value * 1.5}deg` },
-    ],
   }));
 
   const whiteTint = useAnimatedStyle(() => ({
@@ -105,8 +104,10 @@ export default function LevelButton({
     opacity: interpolate(lockProgress.value, RED_IN, RED_OUT),
   }));
 
-  const triggerLockedFeedback = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+  const triggerUnavailableFeedback = () => {
+    Haptics.notificationAsync(
+      Haptics.NotificationFeedbackType.Warning
+    );
 
     lockProgress.value = 0;
     lockProgress.value = withTiming(1, {
@@ -115,17 +116,19 @@ export default function LevelButton({
     });
 
     lockShake.value = withSequence(
-      withTiming(-6, { duration: 40 }),
-      withRepeat(withTiming(6, { duration: 80 }), 9, true),
-      withTiming(0, { duration: 40 })
+      withTiming(-8, { duration: 50 }),
+      withRepeat(
+        withTiming(8, { duration: 70 }),
+        5,
+        true
+      ),
+      withTiming(0, { duration: 50 })
     );
   };
 
   const handlePressIn = () => {
-    if (comingSoon) return;
-
-    if (locked) {
-      triggerLockedFeedback();
+    if (isUnavailable) {
+      triggerUnavailableFeedback();
       return;
     }
 
@@ -143,7 +146,9 @@ export default function LevelButton({
   };
 
   const handlePress = () => {
-    if (!isUnavailable) onPress();
+    if (!isUnavailable) {
+      onPress();
+    }
   };
 
   return (
@@ -152,7 +157,6 @@ export default function LevelButton({
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      disabled={comingSoon}
     >
       <Animated.View style={[styles.fill, bodyStyle]}>
         <Image
@@ -192,12 +196,7 @@ export default function LevelButton({
 
         <View style={styles.iconSlot}>
           {isUnavailable ? (
-            <Animated.View
-              style={[
-                styles.iconBox,
-                !comingSoon && lockShakeStyle,
-              ]}
-            >
+            <Animated.View style={styles.iconBox}>
               {!comingSoon && (
                 <>
                   <Animated.View

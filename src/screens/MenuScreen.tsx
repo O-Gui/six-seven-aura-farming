@@ -1,7 +1,15 @@
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+
+import { useAudioPlayer } from 'expo-audio';
 import { BUTTON_SOUND } from '../audio/buttonSound';
 import { useEffect, useRef, useState } from 'react';
-import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -25,9 +33,14 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 export default function MenuScreen({ navigation }: Props) {
   const [creditsVisible, setCreditsVisible] = useState(false);
+  const [resetVisible, setResetVisible] = useState(false);
 
   const lastPlayedLevel = useProgressStore(
     (state) => state.lastPlayedLevel
+  );
+
+  const resetProgress = useProgressStore(
+    (state) => state.resetProgress
   );
 
   const breathe = useSharedValue(0);
@@ -35,20 +48,25 @@ export default function MenuScreen({ navigation }: Props) {
 
   useEffect(() => {
     breathe.value = withRepeat(
-      withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
+      withTiming(1, {
+        duration: 2400,
+        easing: Easing.inOut(Easing.sin),
+      }),
       -1,
       true
     );
+
     pulse.value = withRepeat(
-      withTiming(1, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
+      withTiming(1, {
+        duration: 2800,
+        easing: Easing.inOut(Easing.sin),
+      }),
       -1,
       true
     );
   }, []);
 
-const buttonSoundPlayer = useAudioPlayer(BUTTON_SOUND);
-const audioStatus = useAudioPlayerStatus(buttonSoundPlayer);
-
+  const buttonSoundPlayer = useAudioPlayer(BUTTON_SOUND);
   const isNavigating = useRef(false);
 
   const playButtonSound = async () => {
@@ -59,7 +77,8 @@ const audioStatus = useAudioPlayerStatus(buttonSoundPlayer);
       console.warn('Erro ao reproduzir som do botão:', error);
     }
   };
-  // Bordas neon "respirando".
+
+  // Bordas neon respirando.
   const frameStyle = useAnimatedStyle(() => ({
     opacity: 0.55 + breathe.value * 0.45,
   }));
@@ -76,7 +95,7 @@ const audioStatus = useAudioPlayerStatus(buttonSoundPlayer);
 
     const levelId =
       lastPlayedLevel !== null &&
-        isLevelImplemented(lastPlayedLevel)
+      isLevelImplemented(lastPlayedLevel)
         ? lastPlayedLevel
         : getFirstAvailableLevel();
 
@@ -85,6 +104,12 @@ const audioStatus = useAudioPlayerStatus(buttonSoundPlayer);
     setTimeout(() => {
       navigation.navigate('Game', { levelId });
     }, 500);
+  };
+
+  const handleReset = async () => {
+    await playButtonSound();
+    resetProgress();
+    setResetVisible(false);
   };
 
   return (
@@ -99,6 +124,7 @@ const audioStatus = useAudioPlayerStatus(buttonSoundPlayer);
           style={styles.leftImage}
           resizeMode="contain"
         />
+
         <Image
           source={require('../../assets/images/bg-right-menu.png')}
           style={styles.rightImage}
@@ -131,6 +157,7 @@ const audioStatus = useAudioPlayerStatus(buttonSoundPlayer);
               icon={require('../../assets/images/icon-playmenu.png')}
               onPress={handlePlay}
             />
+
             <MenuButton
               label="LEVELS LIST"
               fontSize={22}
@@ -143,6 +170,7 @@ const audioStatus = useAudioPlayerStatus(buttonSoundPlayer);
                 navigation.navigate('LevelsList');
               }}
             />
+
             <MenuButton
               label="CREDITS"
               fontSize={22}
@@ -154,10 +182,24 @@ const audioStatus = useAudioPlayerStatus(buttonSoundPlayer);
                 setCreditsVisible(true);
               }}
             />
+
+            {/* Novo botão RESET */}
+            <MenuButton
+              label="RESET"
+              fontSize={20}
+              textColor="#B6FF7A"
+              glowColor="#B6FF7A"
+              background={require('../../assets/images/botao-menu-reset.png')}
+              onPress={() => {
+                void playButtonSound();
+                setResetVisible(true);
+              }}
+            />
           </View>
         </View>
       </SafeAreaView>
 
+      {/* Modal de Credits */}
       <Modal
         visible={creditsVisible}
         transparent
@@ -174,10 +216,64 @@ const audioStatus = useAudioPlayerStatus(buttonSoundPlayer);
           <View style={styles.creditsCard}>
             <Text style={styles.creditsTitle}>CREDITS</Text>
             <Text style={styles.creditsText}>UNWAKE STUDIO</Text>
-            <Text style={styles.creditsText}>POR GUILHERME BASILIO</Text>
+            <Text style={styles.creditsText}>
+              POR GUILHERME BASILIO
+            </Text>
             <Text style={styles.creditsHint}>Toque para fechar</Text>
           </View>
         </Pressable>
+      </Modal>
+
+      {/* Modal de confirmação do RESET */}
+      <Modal
+        visible={resetVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setResetVisible(false)}
+      >
+        <View style={styles.overlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              void playButtonSound();
+              setResetVisible(false);
+            }}
+          />
+
+          <View style={styles.creditsCard}>
+            <Text style={styles.resetTitle}>
+              RESET DO PROGRESSO
+            </Text>
+
+            <Text style={styles.creditsText}>
+              VOCÊ PERDERÁ TODO O SEU PROGRESSO SALVO,
+              INCLUINDO ESTRELAS E FASES DESBLOQUEADAS.
+            </Text>
+
+            <View style={styles.resetActions}>
+              <Pressable
+                style={styles.cancelButton}
+                onPress={() => {
+                  void playButtonSound();
+                  setResetVisible(false);
+                }}
+              >
+                <Text style={styles.cancelText}>
+                  CANCELAR
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.confirmButton}
+                onPress={handleReset}
+              >
+                <Text style={styles.confirmText}>
+                  CONFIRMAR
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -188,6 +284,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+
   backgroundContainer: {
     position: 'absolute',
     top: 0,
@@ -196,6 +293,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 0,
   },
+
   leftImage: {
     position: 'absolute',
     left: 10,
@@ -204,6 +302,7 @@ const styles = StyleSheet.create({
     width: '35%',
     height: '100%',
   },
+
   rightImage: {
     position: 'absolute',
     right: 10,
@@ -212,36 +311,43 @@ const styles = StyleSheet.create({
     width: '35%',
     height: '100%',
   },
+
   safe: {
     flex: 1,
   },
+
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   logoSection: {
     height: '35%',
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   logoWrap: {
     width: '100%',
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   logo: {
     width: '65%',
     height: '100%',
   },
+
   buttons: {
     width: '100%',
     alignItems: 'center',
     gap: 16,
     marginTop: 16,
   },
+
   overlay: {
     flex: 1,
     backgroundColor: colors.overlay,
@@ -249,6 +355,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
+
   creditsCard: {
     width: '100%',
     backgroundColor: colors.background,
@@ -259,19 +366,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+
   creditsTitle: {
     color: colors.cyanLight,
     fontSize: 24,
     fontWeight: '700',
     letterSpacing: 1,
   },
+
   creditsText: {
     color: colors.cyanLight,
     fontSize: 16,
     textAlign: 'center',
   },
+
   creditsHint: {
     color: colors.purpleText,
     fontSize: 12,
+  },
+
+  resetTitle: {
+    color: '#B6FF7A',
+    fontSize: 21,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+
+  resetActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 12,
+  },
+
+  cancelButton: {
+    borderColor: colors.cyan,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+
+  confirmButton: {
+    backgroundColor: '#B6FF7A',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+
+  cancelText: {
+    color: colors.cyanLight,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  confirmText: {
+    color: colors.background,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

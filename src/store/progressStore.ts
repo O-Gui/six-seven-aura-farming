@@ -12,6 +12,7 @@ type ProgressState = {
 
   setStars: (levelId: number, stars: number) => void;
   setLastPlayedLevel: (levelId: number) => void;
+  resetProgress: () => void;
 };
 
 export const useProgressStore = create<ProgressState>()(
@@ -33,6 +34,13 @@ export const useProgressStore = create<ProgressState>()(
 
       setLastPlayedLevel: (levelId) =>
         set({ lastPlayedLevel: levelId }),
+
+      // Apaga todo o progresso salvo.
+      resetProgress: () =>
+        set({
+          stars: {},
+          lastPlayedLevel: null,
+        }),
     }),
     {
       name: 'six-seven-progress',

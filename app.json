@@ -35,7 +35,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash_screen_aurafarming.png",
-          "imageWidth": 420,
+          "imageWidth": 520,
           "resizeMode": "contain",
           "backgroundColor": "#000000"
         }

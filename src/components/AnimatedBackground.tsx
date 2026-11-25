@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors } from '../theme/colors';
 
-const PARTICLE_COUNT = 50;
+const PARTICLE_COUNT = 30;
 
 type ParticleData = {
   x: number;
