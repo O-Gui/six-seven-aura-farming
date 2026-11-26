@@ -1,8 +1,10 @@
 
 import { memo, useEffect } from 'react';
 import {
+  Image,
   ImageSourcePropType,
   StyleSheet,
+  View,
 } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -13,6 +15,14 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import {
+  getImpactHitboxRadius,
+  getNoteEndTop,
+  MISS_COLOR_TRANSITION_MS,
+  NOTE_ASPECT_RATIO,
+  NOTE_WIDTH_RATIO,
+  TARGET_CENTER_RATIO,
+} from '../game/notePosition';
 
 type Props = {
   source: ImageSourcePropType;
@@ -26,6 +36,24 @@ type Props = {
   isMiss: boolean;
   onHitAnimationComplete?: () => void;
 };
+
+function MissTint({ source, gameClock, missTime }: {
+  source: ImageSourcePropType;
+  gameClock: SharedValue<number>;
+  missTime: number;
+}) {
+  const colorStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, Math.max(0, (gameClock.value - missTime) / MISS_COLOR_TRANSITION_MS)),
+  }));
+
+  return (
+    <Animated.Image
+      source={source}
+      resizeMode="contain"
+      style={[styles.sprite, styles.miss, colorStyle]}
+    />
+  );
+}
 
 function FallingNote({
   source,
@@ -41,15 +69,17 @@ function FallingNote({
 }: Props) {
   const opacity = useSharedValue(1);
 
-  const noteWidth = laneWidth * 0.59;
-  const noteHeight = noteWidth / 0.76;
-  const targetCenterY = laneHeight * 0.73;
+  const noteWidth = laneWidth * NOTE_WIDTH_RATIO;
+  const noteHeight = noteWidth / NOTE_ASPECT_RATIO;
+  const targetCenterY = laneHeight * TARGET_CENTER_RATIO;
+  const endTop = getNoteEndTop(laneWidth, laneHeight, approachTimeMs);
+  const travel = targetCenterY + noteHeight / 2;
+  const hitboxBottom = targetCenterY + getImpactHitboxRadius(laneWidth);
+  const missTime = timeMs - approachTimeMs + (hitboxBottom + noteHeight) * approachTimeMs / travel;
 
   // Altura do rastro em relação ao tamanho da nota.
   const trailWidth = noteWidth;
   const trailHeight = noteHeight * 1.2;
-
-  const hitboxBottom = targetCenterY + laneWidth / 2 + 3;
 
   useEffect(() => {
     if (!isHit) return;
@@ -71,62 +101,13 @@ function FallingNote({
   }, [isHit, opacity, onHitAnimationComplete]);
 
   const animatedStyle = useAnimatedStyle(() => {
-    if (approachTimeMs <= 0) {
-      return {
-        top: 0,
-        opacity: 0,
-      };
-    }
-
-    const progress =
-      (gameClock.value - (timeMs - approachTimeMs)) /
-      approachTimeMs;
-
-    const top =
-      -noteHeight +
-      progress * (targetCenterY + noteHeight / 2);
-
-    const passedTarget = top > hitboxBottom;
+    const progress = (gameClock.value - (timeMs - approachTimeMs)) / approachTimeMs;
+    const top = -noteHeight + progress * travel;
+    const visible = progress >= 0 && top <= endTop;
 
     return {
-      top,
-      opacity: isHit
-        ? opacity.value
-        : progress >= 0 && progress <= 1.25
-          ? 1
-          : 0,
-      tintColor: isHit
-        ? '#FFFFFF'
-        : isMiss || passedTarget
-          ? '#FF8C00'
-          : undefined,
-    };
-  });
-
-  const animatedTrailStyle = useAnimatedStyle(() => {
-    if (approachTimeMs <= 0) {
-      return {
-        top: 0,
-        opacity: 0,
-      };
-    }
-
-    const progress =
-      (gameClock.value - (timeMs - approachTimeMs)) /
-      approachTimeMs;
-
-    const noteTop =
-      -noteHeight +
-      progress * (targetCenterY + noteHeight / 2);
-
-    return {
-      // Mantém o rastro conectado à parte superior da nota.
-      top: noteTop - trailHeight + noteHeight * 0.12,
-      opacity: isHit
-        ? opacity.value
-        : progress >= 0 && progress <= 1.25
-          ? 1
-          : 0,
+      transform: [{ translateY: top }],
+      opacity: isHit ? opacity.value : Number(visible),
     };
   });
 
@@ -139,8 +120,11 @@ function FallingNote({
   }
 
   return (
-    <>
-      <Animated.Image
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.group, { width: laneWidth, height: noteHeight }, animatedStyle]}
+    >
+      <Image
         source={trailSource}
         resizeMode="stretch"
         pointerEvents="none"
@@ -150,33 +134,32 @@ function FallingNote({
             left: (laneWidth - trailWidth) / 2,
             width: trailWidth,
             height: trailHeight,
-            opacity: 0.85,
+            top: -trailHeight + noteHeight * 0.12,
           },
-          animatedTrailStyle,
         ]}
       />
 
-      <Animated.Image
-        source={source}
-        resizeMode="contain"
-        pointerEvents="none"
-        style={[
-          styles.note,
-          {
-            left: (laneWidth - noteWidth) / 2,
-            width: noteWidth,
-            height: noteHeight,
-          },
-          animatedStyle,
-        ]}
-      />
-    </>
+      <View style={[styles.note, { left: (laneWidth - noteWidth) / 2, width: noteWidth, height: noteHeight }]}>
+        <Image
+          source={source}
+          resizeMode="contain"
+          style={[styles.sprite, isHit && styles.hit]}
+        />
+        {isMiss && (
+          <MissTint source={source} gameClock={gameClock} missTime={missTime} />
+        )}
+      </View>
+    </Animated.View>
   );
 }
 
 export default memo(FallingNote);
 
 const styles = StyleSheet.create({
+  sprite: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
+  group: { position: 'absolute', top: 0, left: 0 },
+  hit: { tintColor: '#FFFFFF' },
+  miss: { tintColor: '#FF8C00' },
   trail: {
     position: 'absolute',
   },

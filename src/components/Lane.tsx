@@ -1,19 +1,21 @@
 
 import * as Haptics from 'expo-haptics';
 import {
+  createRef,
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
-  useState,
 } from 'react';
 import type { ReactNode } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { Image, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
-  runOnJS,
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -21,50 +23,50 @@ import Animated, {
 import { createAudioPlayer, preload } from 'expo-audio';
 import type { AudioPlayer } from 'expo-audio';
 import { colors } from '../theme/colors';
+import { TARGET_CENTER_RATIO } from '../game/notePosition';
 
 const TARGET = require('../../assets/images/botao-de-impacto.png');
 const IMPACT_SOUND = require('../../assets/sounds/som_botao_impacto.mp3');
 
 void preload(IMPACT_SOUND).catch(() => {});
 
-const INITIAL_WAVE_SLOTS = 8;
+const TARGET_TOP = (TARGET_CENTER_RATIO * 100).toFixed(0) + '%' as `${number}%`;
+const WAVE_SLOTS = Array.from({ length: 8 }, (_, index) => index);
+const IMPACT_PLAYER_COUNT = 4;
 
 type ImpactWaveHandle = {
   start: () => void;
 };
 
 type ImpactWaveProps = {
-  id: number;
   size: number;
-  onComplete: (id: number) => void;
 };
 
 // Cada onda possui seus próprios valores compartilhados.
 // O componente permanece montado e só inicia quando recebe start().
-const ImpactWave = forwardRef<ImpactWaveHandle, ImpactWaveProps>(
-  function ImpactWave({ id, size, onComplete }, ref) {
+const ImpactWave = memo(forwardRef<ImpactWaveHandle, ImpactWaveProps>(
+  function ImpactWave({ size }, ref) {
     const scale = useSharedValue(0.65);
     const opacity = useSharedValue(0);
+
+    useEffect(() => () => {
+      cancelAnimation(scale);
+      cancelAnimation(opacity);
+    }, [opacity, scale]);
 
     useImperativeHandle(
       ref,
       () => ({
         start() {
+          cancelAnimation(scale);
+          cancelAnimation(opacity);
           scale.value = 0.65;
           opacity.value = 0.9;
 
-          scale.value = withTiming(
-            1.9,
-            {
-              duration: 215,
-              easing: Easing.out(Easing.ease),
-            },
-            (finished) => {
-              if (finished) {
-                runOnJS(onComplete)(id);
-              }
-            },
-          );
+          scale.value = withTiming(1.9, {
+            duration: 215,
+            easing: Easing.out(Easing.ease),
+          });
 
           opacity.value = withTiming(0, {
             duration: 215,
@@ -72,7 +74,7 @@ const ImpactWave = forwardRef<ImpactWaveHandle, ImpactWaveProps>(
           });
         },
       }),
-      [id, onComplete, scale, opacity],
+      [scale, opacity],
     );
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -88,6 +90,7 @@ const ImpactWave = forwardRef<ImpactWaveHandle, ImpactWaveProps>(
           {
             width: size,
             height: size,
+            borderRadius: size / 2,
             marginTop: -size / 2,
           },
           animatedStyle,
@@ -95,7 +98,7 @@ const ImpactWave = forwardRef<ImpactWaveHandle, ImpactWaveProps>(
       />
     );
   },
-);
+));
 
 type AudioPoolEntry = {
   player: AudioPlayer;
@@ -110,7 +113,6 @@ type Props = {
   onHeightChange?: (height: number) => void;
   onPress?: () => void;
   canInteract?: boolean;
-  laneId: 'left' | 'right';
 };
 
 export default function Lane({
@@ -119,7 +121,6 @@ export default function Lane({
   onHeightChange,
   onPress,
   canInteract = true,
-  laneId,
 }: Props) {
   const targetSize = width;
 
@@ -127,77 +128,15 @@ export default function Lane({
   // POOL DE ONDAS
   // --------------------------------------------------
 
-  const [waveSlots, setWaveSlots] = useState<number[]>(() =>
-    Array.from({ length: INITIAL_WAVE_SLOTS }, (_, index) => index),
-  );
-
-  const waveSlotsRef = useRef(waveSlots);
-  const nextWaveId = useRef(INITIAL_WAVE_SLOTS);
-
-  // Slots atualmente executando animações.
-  const busyWaves = useRef(new Set<number>());
-
-  // Referências imperativas dos componentes de onda.
-  const waveRefs = useRef(new Map<number, ImpactWaveHandle>());
-
-  // Toques que aguardam a montagem de novos slots.
-  const pendingWaveStarts = useRef(0);
-
-  const finishWave = useCallback((id: number) => {
-    busyWaves.current.delete(id);
-  }, []);
-
-  const startAvailableWave = useCallback(() => {
-    const availableId = waveSlotsRef.current.find(
-      (id) => !busyWaves.current.has(id),
-    );
-
-    if (availableId === undefined) {
-      return false;
-    }
-
-    const wave = waveRefs.current.get(availableId);
-
-    if (!wave) {
-      return false;
-    }
-
-    busyWaves.current.add(availableId);
-    wave.start();
-
-    return true;
-  }, []);
+  const nextWave = useRef(0);
+  const waveRefs = useMemo(() => WAVE_SLOTS.map(() => createRef<ImpactWaveHandle>()), []);
 
   const triggerWave = useCallback(() => {
-    // Primeiro tenta utilizar um slot já montado.
-    if (startAvailableWave()) {
-      return;
-    }
-
-    // Se todos estiverem ocupados, cria um novo slot.
-    // Nenhuma animação ativa é interrompida.
-    const newId = nextWaveId.current++;
-
-    waveSlotsRef.current = [...waveSlotsRef.current, newId];
-    pendingWaveStarts.current += 1;
-
-    setWaveSlots(waveSlotsRef.current);
-  }, [startAvailableWave]);
-
-  // Depois que novos componentes são montados,
-  // inicia os impactos que estavam aguardando.
-  useEffect(() => {
-    while (
-      pendingWaveStarts.current > 0 &&
-      startAvailableWave()
-    ) {
-      pendingWaveStarts.current -= 1;
-    }
-  }, [waveSlots, startAvailableWave]);
-
-  // --------------------------------------------------
-  // POOL DE ÁUDIO
-  // --------------------------------------------------
+    // Reutiliza a onda mais antiga quando os oito slots giram.
+    const slot = nextWave.current;
+    nextWave.current = (slot + 1) % WAVE_SLOTS.length;
+    waveRefs[slot].current?.start();
+  }, [waveRefs]);
 
   const audioPool = useRef<AudioPoolEntry[]>([]);
   const mounted = useRef(true);
@@ -207,7 +146,7 @@ export default function Lane({
 
     const entry: AudioPoolEntry = {
       player,
-      busy: true,
+      busy: false,
       needsReset: false,
     };
 
@@ -229,46 +168,28 @@ export default function Lane({
   const playImpactSound = useCallback(() => {
     if (!mounted.current) return;
 
+    const entry = audioPool.current.find((item) => !item.busy);
+    if (!entry) return;
+
+    entry.busy = true;
     try {
-      // Procura um player que não esteja reproduzindo.
-      let entry = audioPool.current.find(
-        (item) => !item.busy,
-      );
-
-      // Se todos estiverem ocupados, cria outro.
-      if (!entry) {
-        entry = createPoolPlayer();
-      } else {
-        entry.busy = true;
-      }
-
-      const player = entry.player;
-
-      // Players novos já começam no início.
       if (!entry.needsReset) {
-        player.play();
+        entry.player.play();
         return;
       }
 
-      // Só reposiciona players cuja reprodução terminou.
-      // Nunca altera o áudio de um player ocupado.
-      entry.needsReset = false;
-
-      void player
-        .seekTo(0)
-        .then(() => {
-          if (mounted.current) {
-            player.play();
-          }
-        })
-        .catch((error) => {
-          entry!.busy = false;
-          console.warn('[IMPACTO] Erro ao reiniciar áudio:', error);
-        });
-    } catch (error) {
-      console.warn('[IMPACTO] Erro ao reproduzir áudio:', error);
+      void entry.player.seekTo(0).then(() => {
+        if (audioPool.current.includes(entry)) {
+          entry.player.play();
+          entry.needsReset = false;
+        }
+      }).catch(() => {
+        entry.busy = false;
+      });
+    } catch {
+      entry.busy = false;
     }
-  }, [createPoolPlayer]);
+  }, []);
 
   // --------------------------------------------------
   // CICLO DE VIDA
@@ -276,6 +197,14 @@ export default function Lane({
 
   useEffect(() => {
     mounted.current = true;
+    for (let index = 0; index < IMPACT_PLAYER_COUNT; index++) {
+      try {
+        createPoolPlayer();
+      } catch (error) {
+        console.warn('Erro ao preparar som de impacto:', error);
+        break;
+      }
+    }
 
     return () => {
       mounted.current = false;
@@ -291,10 +220,8 @@ export default function Lane({
       }
 
       audioPool.current = [];
-      busyWaves.current.clear();
-      waveRefs.current.clear();
     };
-  }, []);
+  }, [createPoolPlayer]);
 
   // --------------------------------------------------
   // IMPACTO
@@ -321,13 +248,9 @@ export default function Lane({
       event.nativeEvent.changedTouches?.length ?? 1,
     );
 
-    console.log(
-      `[IMPACTO] Pista: ${laneId} | Toques: ${touchCount}`,
-    );
-
     for (let i = 0; i < touchCount; i++) {
-      triggerImpact();
       onPress();
+      triggerImpact();
     }
   }
 
@@ -349,15 +272,13 @@ export default function Lane({
         style={[
           styles.target,
           {
-            top: '73%',
+            top: TARGET_TOP,
             marginTop: -targetSize / 2,
             width: targetSize,
             height: targetSize,
           },
         ]}
       >
-        <View style={styles.glow} />
-
         <Image
           source={TARGET}
           resizeMode="contain"
@@ -366,19 +287,11 @@ export default function Lane({
       </View>
 
       {/* Pool de ondas independentes */}
-      {waveSlots.map((id) => (
+      {WAVE_SLOTS.map((id) => (
         <ImpactWave
           key={id}
-          ref={(instance) => {
-            if (instance) {
-              waveRefs.current.set(id, instance);
-            } else {
-              waveRefs.current.delete(id);
-            }
-          }}
-          id={id}
+          ref={waveRefs[id]}
           size={targetSize}
-          onComplete={finishWave}
         />
       ))}
 
@@ -401,7 +314,7 @@ const styles = StyleSheet.create({
   target: {
     position: 'absolute',
     left: 0,
-    zIndex: 2,
+    zIndex: 3,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -409,16 +322,11 @@ const styles = StyleSheet.create({
   impactAura: {
     position: 'absolute',
     left: 0,
-    top: '73%',
+    top: TARGET_TOP,
     zIndex: 2,
-    borderRadius: 999,
     borderWidth: 3,
     borderColor: '#39FF70',
     backgroundColor: 'rgba(57, 255, 112, 0.13)',
-    shadowColor: '#39FF70',
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 12,
   },
 
   touchZone: {
@@ -431,20 +339,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 
-  glow: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: 999,
-    backgroundColor: 'rgba(57, 255, 112, 0.09)',
-    shadowColor: '#39FF70',
-    shadowOpacity: 0.9,
-    shadowRadius: 13,
-    elevation: 8,
-  },
-
   targetImage: {
     width: '100%',
     height: '100%',
-    zIndex: 1,
   },
 
   notesViewport: {

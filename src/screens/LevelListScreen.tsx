@@ -1,4 +1,5 @@
-import { BUTTON_SOUND } from '../audio/buttonSound';
+import { useRef } from 'react';
+import { useButtonSound } from '../audio/buttonSound';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -10,7 +11,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useAudioPlayer } from 'expo-audio';
 
 import type { RootStackParamList } from '../navigation/types';
 import AnimatedBackground from '../components/AnimatedBackground';
@@ -27,20 +27,15 @@ export default function LevelListScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const stars = useProgressStore((state) => state.stars);
 
-  // Player único para os botões da lista.
-const buttonSoundPlayer = useAudioPlayer(BUTTON_SOUND);
-  const playButtonSound = async () => {
-    try {
-      await buttonSoundPlayer.seekTo(0);
-      buttonSoundPlayer.play();
-    } catch (error) {
-      console.warn('Erro ao reproduzir som do botão:', error);
-    }
-  };
+  const playButtonSound = useButtonSound();
+  const leaving = useRef(false);
 
-  const handleBack = async () => {
-    await playButtonSound();
-    navigation.navigate('Home');
+  const handleBack = () => {
+    if (leaving.current || !navigation.isFocused()) return;
+
+    leaving.current = true;
+    playButtonSound();
+    navigation.popTo('Home');
   };
 
   return (
@@ -66,12 +61,15 @@ const buttonSoundPlayer = useAudioPlayer(BUTTON_SOUND);
               <LevelButton
                 key={level.id}
                 label={implemented ? `LEVEL ${level.id}` : 'EM BREVE'}
+                earnedStars={stars[level.id] ?? 0}
                 locked={implemented && !unlocked}
                 comingSoon={!implemented}
-                onPress={async () => {
-                  if (!implemented || !unlocked) return;
+                onPress={() => {
+                  if (!implemented || !unlocked || leaving.current || !navigation.isFocused()) return;
 
-                  await playButtonSound();
+                  leaving.current = true;
+
+                  playButtonSound();
 
                   navigation.navigate('Game', {
                     levelId: level.id,

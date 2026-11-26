@@ -1,7 +1,9 @@
+import { useIsFocused } from '@react-navigation/native';
 import { useEffect, useMemo } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
+  cancelAnimation,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
@@ -21,16 +23,19 @@ type ParticleData = {
   offset: number;
 };
 
-function Particle({ data }: { data: ParticleData }) {
+function Particle({ data, active }: { data: ParticleData; active: boolean }) {
   const progress = useSharedValue(0);
 
   useEffect(() => {
+    if (!active) return;
+
     progress.value = withRepeat(
       withTiming(1, { duration: data.duration, easing: Easing.linear }),
       -1,
       false
     );
-  }, []);
+    return () => cancelAnimation(progress);
+  }, [active, data.duration, progress]);
 
   const style = useAnimatedStyle(() => {
     const p = (progress.value + data.offset) % 1;
@@ -58,6 +63,7 @@ function Particle({ data }: { data: ParticleData }) {
 }
 
 export default function AnimatedBackground() {
+  const active = useIsFocused();
   const { width, height } = useWindowDimensions();
 
   const particles = useMemo<ParticleData[]>(
@@ -76,7 +82,7 @@ export default function AnimatedBackground() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {particles.map((p, i) => (
-        <Particle key={i} data={p} />
+        <Particle key={i} data={p} active={active} />
       ))}
     </View>
   );

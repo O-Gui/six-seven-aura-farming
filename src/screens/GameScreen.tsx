@@ -1,12 +1,11 @@
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   Dispatch,
   SetStateAction,
 } from 'react';
 import { useIsFocused } from '@react-navigation/native';
 import {
-  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -19,8 +18,8 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
   useAudioPlayer,
-  useAudioPlayerStatus,
 } from 'expo-audio';
+import type { AudioStatus } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSharedValue } from 'react-native-reanimated';
@@ -39,10 +38,13 @@ import {
 } from '../store/gameStore';
 
 import { colors } from '../theme/colors';
+import { useButtonSound } from '../audio/buttonSound';
 import { getBeatmap } from '../beatmaps';
 
 import {
   canHitNote,
+  getImpactHitboxRadius,
+  getNoteEndTop,
   getNotePosition,
 } from '../game/notePosition';
 import { isLevelImplemented } from '../game/levels';
@@ -50,8 +52,8 @@ import { useProgressStore } from '../store/progressStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 
-const HEADER_ROW = 48;
-const FOOTER_HEIGHT = 110;
+const HEADER_ROW = 44;
+const FOOTER_HEIGHT = 76;
 const COUNTDOWN_DURATION = 4000;
 
 type Beatmap = ReturnType<typeof getBeatmap>;
@@ -61,21 +63,21 @@ type Note = Beatmap['notes'][number];
 type ScheduledNote = {
   index: number;
   startMs: number;
-  endMs: number;
+  missAfterMs: number;
+  visibleUntilMs: number;
+  hitEffectUntilMs: number;
 };
 
 type PreparedBeatmap = {
   schedule: ScheduledNote[];
-  endTimes: number[];
+  notesByIndex: ScheduledNote[];
 };
 
 type AudioClockBridgeProps = {
   player: ReturnType<typeof useAudioPlayer>;
   status: GameStatus;
-  laneWidth: number;
-  laneHeight: number;
+  isFocused: boolean;
   preparedBeatmap: PreparedBeatmap;
-  beatmap: Beatmap;
   gameClock: SharedValue<number>;
   gameTimeRef: { current: number };
   nextNoteCursor: { current: number };
@@ -83,123 +85,82 @@ type AudioClockBridgeProps = {
   setActiveNoteIndices: Dispatch<SetStateAction<number[]>>;
 };
 
-// Prepara a sequência uma única vez antes da partida.
-function prepareBeatmap(beatmap: Beatmap): PreparedBeatmap {
-  const schedule: ScheduledNote[] = [];
-  const endTimes: number[] = [];
+// Converte a geometria da pista em horários quando o layout muda.
+function prepareBeatmap(beatmap: Beatmap, laneWidth: number, laneHeight: number): PreparedBeatmap {
+  const { approachTimeMs } = beatmap;
+  const geometry = getNotePosition(laneWidth, laneHeight, 0, 0, approachTimeMs);
+  let missOffsetMs = Infinity;
+  let visibleOffsetMs = Infinity;
+  if (geometry) {
+    const { noteHeight, targetCenterY } = geometry;
+    const msPerPoint = approachTimeMs / (targetCenterY + noteHeight / 2);
+    const hitboxBottom = targetCenterY + getImpactHitboxRadius(laneWidth);
+    const endTop = getNoteEndTop(laneWidth, laneHeight, approachTimeMs);
+    missOffsetMs = (hitboxBottom + noteHeight) * msPerPoint;
+    visibleOffsetMs = (endTop + noteHeight) * msPerPoint;
+  }
 
-  beatmap.notes.forEach((note, index) => {
-    const startMs = note.timeMs - beatmap.approachTimeMs;
-    const endMs =
-      startMs + beatmap.approachTimeMs * 1.25;
-
-    schedule.push({
+  const notesByIndex = beatmap.notes.map((note, index) => {
+    const startMs = note.timeMs - approachTimeMs;
+    return {
       index,
       startMs,
-      endMs,
-    });
-
-    endTimes[index] = endMs;
+      missAfterMs: startMs + missOffsetMs,
+      visibleUntilMs: startMs + visibleOffsetMs,
+      hitEffectUntilMs: note.timeMs + 1000,
+    };
   });
-
-  schedule.sort((a, b) => a.startMs - b.startMs);
-
-  return {
-    schedule,
-    endTimes,
-  };
+  const schedule = notesByIndex.slice().sort((a, b) => a.startMs - b.startMs);
+  return { schedule, notesByIndex };
 }
 
-// Atualiza somente as notas que estão na janela de execução.
 function updateActiveNotes(
   currentTimeMs: number,
-  beatmap: Beatmap,
   prepared: PreparedBeatmap,
   nextNoteCursor: { current: number },
   activeNoteIndicesRef: { current: number[] },
   setter: Dispatch<SetStateAction<number[]>>,
-  laneWidth: number,
-  laneHeight: number,
 ) {
-  const resolved = useGameStore.getState().resolved;
-  const expiredIndices: number[] = [];
-
-  const hasPassedHitbox = (index: number) => {
-    if (laneWidth <= 0 || laneHeight <= 0) {
-      return false;
-    }
-
-    const note = beatmap.notes[index];
-
-    const position = getNotePosition(
-      laneWidth,
-      laneHeight,
-      currentTimeMs,
-      note.timeMs,
-      beatmap.approachTimeMs,
-    );
-
-    if (!position) return false;
-
-    const hitboxBottom =
-      position.targetCenterY + laneWidth / 2 + 3;
-
-    return position.top >= hitboxBottom;
-  };
-
-  const nextIndices = activeNoteIndicesRef.current.filter((index) => {
-    const stillVisible =
-      currentTimeMs <= prepared.endTimes[index];
-
-    const wasRecentlyHit =
-      resolved[index] === 'hit' &&
-      currentTimeMs <= beatmap.notes[index].timeMs + 1000;
-
-    const passedHitbox = hasPassedHitbox(index);
-
-    if (
-      passedHitbox &&
-      resolved[index] === undefined
-    ) {
-      expiredIndices.push(index);
-    }
-
-    return stillVisible || wasRecentlyHit;
-  });
-
+  const previous = activeNoteIndicesRef.current;
+  const { schedule, notesByIndex } = prepared;
   let cursor = nextNoteCursor.current;
+  const nextScheduled = schedule[cursor];
+  if (!previous.length && (!nextScheduled || nextScheduled.startMs > currentTimeMs)) return;
 
-  while (cursor < prepared.schedule.length) {
-    const scheduled = prepared.schedule[cursor];
+  const { resolved, resolveMisses } = useGameStore.getState();
+  let nextIndices: number[] | undefined;
+  let expiredIndices: number[] | undefined;
 
-    if (scheduled.startMs > currentTimeMs) {
-      break;
+  for (let position = 0; position < previous.length; position++) {
+    const index = previous[position];
+    const note = notesByIndex[index];
+    const result = resolved[index];
+
+    if (result === undefined && currentTimeMs > note.missAfterMs) {
+      (expiredIndices ??= []).push(index);
     }
 
-    const alreadyPassed = hasPassedHitbox(scheduled.index);
-
-    if (!alreadyPassed) {
-      nextIndices.push(scheduled.index);
-    } else if (resolved[scheduled.index] === undefined) {
-      expiredIndices.push(scheduled.index);
+    const visibleUntilMs = result === 'hit' ? note.hitEffectUntilMs : note.visibleUntilMs;
+    if (currentTimeMs > visibleUntilMs) {
+      nextIndices ??= previous.slice(0, position);
+    } else {
+      nextIndices?.push(index);
     }
-
-    cursor++;
   }
 
+  while (cursor < schedule.length && schedule[cursor].startMs <= currentTimeMs) {
+    const note = schedule[cursor++];
+    if (resolved[note.index] === undefined && currentTimeMs > note.missAfterMs) {
+      (expiredIndices ??= []).push(note.index);
+    }
+    if (currentTimeMs <= note.visibleUntilMs) {
+      (nextIndices ??= previous.slice()).push(note.index);
+    }
+  }
   nextNoteCursor.current = cursor;
 
-  for (const index of expiredIndices) {
-    useGameStore.getState().resolveNote(index, 'miss');
-  }
-
-  const previous = activeNoteIndicesRef.current;
-
-  const unchanged =
-    previous.length === nextIndices.length &&
-    previous.every((index, position) => index === nextIndices[position]);
-
-  if (!unchanged) {
+  if (expiredIndices) resolveMisses(expiredIndices);
+  if (nextIndices) {
     activeNoteIndicesRef.current = nextIndices;
     setter(nextIndices);
   }
@@ -209,64 +170,67 @@ function updateActiveNotes(
 function AudioClockBridge({
   player,
   status,
+  isFocused,
   preparedBeatmap,
-  beatmap,
   gameClock,
   gameTimeRef,
   nextNoteCursor,
   activeNoteIndicesRef,
   setActiveNoteIndices,
-  laneWidth,
-  laneHeight,
 }: AudioClockBridgeProps) {
-  const audioStatus = useAudioPlayerStatus(player);
-
   useEffect(() => {
-    if (status === 'paused' || status === 'countdown') {
-      return;
-    }
+    if (status === 'paused' || status === 'countdown') return;
 
-    if (status !== 'playing') {
+    if (!isFocused || (status !== 'playing' && status !== 'finishing')) {
       nextNoteCursor.current = 0;
       activeNoteIndicesRef.current = [];
       setActiveNoteIndices([]);
       return;
     }
 
-    const currentTimeMs = audioStatus.currentTime * 1000;
+    let subscribed = true;
+    let lastTimeMs: number | undefined;
+    const updateClock = (audioStatus: AudioStatus) => {
+      if (!subscribed) return;
+      const game = useGameStore.getState();
+      if (game.status !== 'playing' && game.status !== 'finishing') return;
 
-    gameClock.value = currentTimeMs;
-    gameTimeRef.current = currentTimeMs;
+      const currentTimeMs = audioStatus.currentTime * 1000;
+      if (lastTimeMs !== currentTimeMs && Number.isFinite(currentTimeMs)) {
+        lastTimeMs = currentTimeMs;
+        gameClock.value = currentTimeMs;
+        gameTimeRef.current = currentTimeMs;
+        if (game.status === 'playing') {
+          updateActiveNotes(
+            currentTimeMs,
+            preparedBeatmap,
+            nextNoteCursor,
+            activeNoteIndicesRef,
+            setActiveNoteIndices,
+          );
+        }
+      }
 
-    updateActiveNotes(
-      currentTimeMs,
-      beatmap,
-      preparedBeatmap,
-      nextNoteCursor,
-      activeNoteIndicesRef,
-      setActiveNoteIndices,
-      laneWidth,
-      laneHeight,
-    );
+      if (audioStatus.didJustFinish) game.failRemainingNotes();
+    };
+
+    const subscription = player.addListener('playbackStatusUpdate', updateClock);
+    updateClock(player.currentStatus);
+    return () => {
+      subscribed = false;
+      subscription.remove();
+    };
   }, [
-    audioStatus.currentTime,
+    player,
     status,
-    beatmap,
+    isFocused,
     preparedBeatmap,
     gameClock,
     gameTimeRef,
     nextNoteCursor,
     activeNoteIndicesRef,
     setActiveNoteIndices,
-    laneWidth,
-    laneHeight,
   ]);
-
-  useEffect(() => {
-    if (audioStatus.didJustFinish) {
-      useGameStore.getState().failRemainingNotes();
-    }
-  }, [audioStatus.didJustFinish]);
 
   return null;
 }
@@ -280,6 +244,7 @@ type ActiveNoteProps = {
   approachTimeMs: number;
   source: number;
   trailSource: number;
+  onFadeComplete: (index: number) => void;
 };
 
 // Cada nota observa somente o próprio estado de acerto.
@@ -292,14 +257,10 @@ const ActiveNote = memo(function ActiveNote({
   approachTimeMs,
   source,
   trailSource,
+  onFadeComplete,
 }: ActiveNoteProps) {
-  const isHit = useGameStore(
-    (state) => state.resolved[index] === 'hit',
-  );
-
-  const isMiss = useGameStore(
-    (state) => state.resolved[index] === 'miss',
-  );
+  const result = useGameStore((state) => state.resolved[index]);
+  const handleFadeComplete = useCallback(() => onFadeComplete(index), [index, onFadeComplete]);
 
   return (
     <FallingNote
@@ -310,8 +271,9 @@ const ActiveNote = memo(function ActiveNote({
       gameClock={gameClock}
       timeMs={note.timeMs}
       approachTimeMs={approachTimeMs}
-      isHit={isHit}
-      isMiss={isMiss}
+      isHit={result === 'hit'}
+      isMiss={result === 'miss'}
+      onHitAnimationComplete={handleFadeComplete}
     />
   );
 });
@@ -339,9 +301,10 @@ export default function GameScreen({ navigation, route }: Props) {
     [levelId],
   );
 
+  const [laneHeight, setLaneHeight] = useState(0);
   const preparedBeatmap = useMemo(
-    () => prepareBeatmap(beatmap),
-    [beatmap],
+    () => prepareBeatmap(beatmap, laneWidth, laneHeight),
+    [beatmap, laneWidth, laneHeight],
   );
 
   const preRollDurationMs = useMemo(() => {
@@ -371,31 +334,35 @@ const player = useAudioPlayer(
     require('../../assets/sounds/contagem_regressiva.mp3'),
   );
 
-  // SOM DOS BOTÕES: um único player para os botões desta tela.
-  const buttonSoundPlayer = useAudioPlayer(
-    require('../../assets/sounds/som_botoes_menu.mp3'),
-  );
-
-  const playButtonSound = () => {
-    void buttonSoundPlayer.seekTo(0);
-    buttonSoundPlayer.play();
-  };
+  const playButtonSound = useButtonSound();
 
   const gameClock = useSharedValue(-COUNTDOWN_DURATION);
   const gameTimeRef = useRef(-COUNTDOWN_DURATION);
 
+  const sessionActive = useRef(false);
   const nextNoteCursor = useRef(0);
   const activeNoteIndicesRef = useRef<number[]>([]);
 
   const [activeNoteIndices, setActiveNoteIndices] = useState<number[]>([]);
-  const [laneHeight, setLaneHeight] = useState(0);
+  const removeFadedNote = useCallback((index: number) => {
+    if (!sessionActive.current || !navigation.isFocused()) return;
+    const game = useGameStore.getState();
+    if (game.resolved[index] !== 'hit') return;
+
+    const active = activeNoteIndicesRef.current;
+    if (!active.includes(index)) return;
+
+    const remaining = active.filter((activeIndex) => activeIndex !== index);
+    activeNoteIndicesRef.current = remaining;
+    setActiveNoteIndices(remaining);
+    game.finishLastHit(index);
+  }, [navigation]);
   const [countdownLabel, setCountdownLabel] = useState('3');
 
   const countdownRemaining = useRef(COUNTDOWN_DURATION);
 
   const countdownAudioEnabled = useRef(false);
   const countdownAudioStarted = useRef(false);
-  const countdownAudioStarting = useRef(false);
 
   const status = useGameStore((state) => state.status);
 
@@ -407,92 +374,51 @@ const player = useAudioPlayer(
     resume,
   } = useGameStore.getState();
 
-  // Inicialização da fase.
   useEffect(() => {
-    if (!isFocused) {
-      player.pause();
-      player.seekTo(0);
-
-      countdownPlayer.pause();
-      countdownPlayer.seekTo(0);
-
-      return;
-    }
+    if (!isFocused) return;
 
     if (!isLevelImplemented(levelId)) {
       navigation.replace('LevelsList');
       return;
     }
 
-    countdownRemaining.current = COUNTDOWN_DURATION;
-
+    sessionActive.current = true;
     countdownAudioEnabled.current = true;
     countdownAudioStarted.current = false;
-    countdownAudioStarting.current = false;
-
-    nextNoteCursor.current = 0;
-    activeNoteIndicesRef.current = [];
-
-    setCountdownLabel('3');
-    setActiveNoteIndices([]);
-    setLaneHeight(0);
-
-    gameClock.value = -COUNTDOWN_DURATION;
-    gameTimeRef.current = -COUNTDOWN_DURATION;
-
-    player.pause();
-    player.seekTo(0);
-
-    countdownPlayer.pause();
-    countdownPlayer.seekTo(0);
-
+    countdownRemaining.current = COUNTDOWN_DURATION;
     useProgressStore.getState().setLastPlayedLevel(levelId);
-
     startLevel(levelId, beatmap.notes.length);
-  }, [isFocused, levelId, navigation]);
 
-  // Reprodução e controle do áudio da contagem.
+    return () => {
+      sessionActive.current = false;
+      countdownAudioEnabled.current = false;
+      activeNoteIndicesRef.current = [];
+      nextNoteCursor.current = 0;
+      useGameStore.getState().reset();
+    };
+  }, [beatmap.notes.length, isFocused, levelId, navigation, startLevel]);
+
   useEffect(() => {
-    if (
-      !isFocused ||
-      status !== 'countdown' ||
-      !countdownAudioEnabled.current
-    ) {
-      countdownPlayer.pause();
+    if (!isFocused || status !== 'countdown' || !countdownAudioEnabled.current) return;
+
+    if (countdownAudioStarted.current) {
+      countdownPlayer.play();
       return;
     }
 
-    if (
-      !countdownAudioStarted.current &&
-      !countdownAudioStarting.current
-    ) {
-      countdownAudioStarting.current = true;
+    let cancelled = false;
+    void countdownPlayer.seekTo(0).then(() => {
+      if (cancelled || !sessionActive.current || !navigation.isFocused()
+        || !countdownAudioEnabled.current || useGameStore.getState().status !== 'countdown') return;
 
-      const startCountdownAudio = async () => {
-        try {
-          await countdownPlayer.seekTo(0);
-
-          countdownAudioStarting.current = false;
-          countdownAudioStarted.current = true;
-
-          if (
-            countdownAudioEnabled.current &&
-            isFocused &&
-            useGameStore.getState().status === 'countdown'
-          ) {
-            countdownPlayer.play();
-          }
-        } catch (error) {
-          countdownAudioStarting.current = false;
-          console.warn('Erro ao iniciar áudio da contagem:', error);
-        }
-      };
-
-      void startCountdownAudio();
-    } else if (countdownAudioStarted.current) {
+      countdownAudioStarted.current = true;
       countdownPlayer.play();
-    }
-  }, [status, isFocused, countdownPlayer]);
+    }).catch((error) => {
+      if (!cancelled) console.warn('Erro ao iniciar áudio da contagem:', error);
+    });
+
+    return () => { cancelled = true; };
+  }, [countdownPlayer, isFocused, navigation, status]);
 
   // Countdown seguido pelo pré-roll das notas.
   useEffect(() => {
@@ -504,14 +430,8 @@ const player = useAudioPlayer(
 
     let preRollInterval: ReturnType<typeof setInterval> | null = null;
 
-    const startPreRoll = async () => {
-      try {
-        await player.seekTo(0);
-      } catch {
-        return;
-      }
-
-      if (cancelled || !isFocused) return;
+    const startPreRoll = () => {
+      if (cancelled || !sessionActive.current || !navigation.isFocused()) return;
 
       nextNoteCursor.current = 0;
       activeNoteIndicesRef.current = [];
@@ -520,7 +440,7 @@ const player = useAudioPlayer(
       const preRollStartAt = Date.now();
 
       const updatePreRoll = () => {
-        if (cancelled || !isFocused) return;
+        if (cancelled || !sessionActive.current || !navigation.isFocused()) return;
 
         const elapsed = Date.now() - preRollStartAt;
 
@@ -534,13 +454,10 @@ const player = useAudioPlayer(
 
         updateActiveNotes(
           visualTime,
-          beatmap,
           preparedBeatmap,
           nextNoteCursor,
           activeNoteIndicesRef,
           setActiveNoteIndices,
-          laneWidth,
-          laneHeight,
         );
 
         if (elapsed >= preRollDurationMs) {
@@ -564,7 +481,7 @@ const player = useAudioPlayer(
     const updateCountdown = () => {
       const remaining = endAt - Date.now();
 
-      if (!isFocused || cancelled) return;
+      if (cancelled || !sessionActive.current || !navigation.isFocused()) return;
 
       const countdownTime = -Math.max(remaining, 0);
 
@@ -580,7 +497,7 @@ const player = useAudioPlayer(
         countdownAudioEnabled.current = false;
         countdownPlayer.pause();
 
-        void startPreRoll();
+        startPreRoll();
 
         return;
       }
@@ -612,32 +529,28 @@ const player = useAudioPlayer(
     isFocused,
     player,
     countdownPlayer,
+    navigation,
     preRollDurationMs,
     beginPlaying,
-    beatmap,
     preparedBeatmap,
     gameClock,
     gameTimeRef,
     nextNoteCursor,
     activeNoteIndicesRef,
     setActiveNoteIndices,
-    laneWidth,
-    laneHeight,
   ]);
 
   const audioBridge = (
     <AudioClockBridge
       player={player}
       status={status}
-      beatmap={beatmap}
+      isFocused={isFocused}
       preparedBeatmap={preparedBeatmap}
       gameClock={gameClock}
       gameTimeRef={gameTimeRef}
       nextNoteCursor={nextNoteCursor}
       activeNoteIndicesRef={activeNoteIndicesRef}
       setActiveNoteIndices={setActiveNoteIndices}
-      laneWidth={laneWidth}
-      laneHeight={laneHeight}
     />
   );
 
@@ -652,38 +565,19 @@ const player = useAudioPlayer(
     return () => clearTimeout(timeout);
   }, [countdownLabel]);
 
-  // Para os áudios ao terminar.
   useEffect(() => {
-    if (status === 'finished') {
-      player.pause();
-      countdownPlayer.pause();
-    }
-  }, [status, player, countdownPlayer]);
+    if (status !== 'finished' || !navigation.isFocused()) return;
+    const { hits, misses, totalNotes, stars, outcome } = useGameStore.getState();
+    if (!outcome) return;
 
-  // Aguarda 3 segundos antes de abrir a tela de resultado.
-  useEffect(() => {
-    if (status !== 'finished') return;
-
-    const timeout = setTimeout(() => {
-      navigation.replace('Result', { levelId });
-    }, 1000);
-
-    return () => clearTimeout(timeout);
-  }, [status, levelId, navigation]);
+    player.pause();
+    countdownPlayer.pause();
+    navigation.replace('Result', { levelId, hits, misses, totalNotes, stars, outcome });
+  }, [countdownPlayer, levelId, navigation, player, status]);
 
   const goToMenu = () => {
     playButtonSound();
-
-    player.pause();
-    player.seekTo(0);
-
-    countdownAudioEnabled.current = false;
-    countdownPlayer.pause();
-    countdownPlayer.seekTo(0);
-
-    useGameStore.getState().reset();
-
-    navigation.navigate('Home');
+    navigation.popTo('Home');
   };
 
   const pauseGame = () => {
@@ -713,12 +607,6 @@ const player = useAudioPlayer(
       player.play();
     }
 
-    if (
-      previousStatus === 'countdown' &&
-      countdownAudioEnabled.current
-    ) {
-      countdownPlayer.play();
-    }
   };
 
   // Procura somente entre as notas atualmente ativas.
@@ -778,6 +666,7 @@ const player = useAudioPlayer(
 
         <View style={styles.titleRow}>
           <Pressable
+            disabled={status === 'finishing' || status === 'finished'}
             onPress={pauseGame}
             onPressIn={() =>
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -811,7 +700,6 @@ const player = useAudioPlayer(
           onHeightChange={setLaneHeight}
           onPress={() => handleLanePress('left')}
           canInteract={status === 'playing'}
-          laneId="left"
         >
           {activeNoteIndices.map((index) => {
             const note = beatmap.notes[index];
@@ -829,6 +717,7 @@ const player = useAudioPlayer(
                 laneHeight={laneHeight}
                 gameClock={gameClock}
                 approachTimeMs={beatmap.approachTimeMs}
+                onFadeComplete={removeFadedNote}
               />
             );
           })}
@@ -839,7 +728,6 @@ const player = useAudioPlayer(
           onHeightChange={setLaneHeight}
           onPress={() => handleLanePress('right')}
           canInteract={status === 'playing'}
-          laneId="right"
         >
           {activeNoteIndices.map((index) => {
             const note = beatmap.notes[index];
@@ -857,6 +745,7 @@ const player = useAudioPlayer(
                 laneHeight={laneHeight}
                 gameClock={gameClock}
                 approachTimeMs={beatmap.approachTimeMs}
+                onFadeComplete={removeFadedNote}
               />
             );
           })}
@@ -890,20 +779,6 @@ const player = useAudioPlayer(
 
         <Text style={styles.footerText}>LEVEL {levelId}</Text>
       </View>
-
-      {/* Loading da transição para o resultado */}
-      {status === 'finished' && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator
-            size="large"
-            color={colors.cyan}
-          />
-
-          <Text style={styles.loadingText}>
-            PREPARANDO RESULTADO...
-          </Text>
-        </View>
-      )}
 
       {/* Menu de pausa */}
       <Modal
@@ -943,26 +818,6 @@ const player = useAudioPlayer(
 }
 
 const styles = StyleSheet.create({
-  loadingOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 100,
-    gap: 18,
-    paddingBottom: '40%',
-  },
-
-  loadingText: {
-    color: colors.cyan,
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 2,
-    textShadowColor: colors.cyan,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
-
   root: {
     flex: 1,
     backgroundColor: colors.background,
@@ -971,7 +826,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.headerBackground,
     borderBottomWidth: 1,
     borderBottomColor: colors.headerLine,
-    paddingBottom: 8,
+    paddingBottom: 5,
   },
   headerBackground: {
     position: 'absolute',
@@ -1064,6 +919,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   footerBackground: {
+    opacity: 0.28,
     position: 'absolute',
     top: 0,
     left: 0,

@@ -17,24 +17,22 @@ type ProgressState = {
 
 export const useProgressStore = create<ProgressState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       stars: {},
       lastPlayedLevel: null,
 
-      setStars: (levelId, stars) =>
-        set((state) => ({
-          stars: {
-            ...state.stars,
-            [levelId]: Math.max(
-              state.stars[levelId] ?? 0,
-              stars
-            ),
-          },
-        })),
+      setStars: (levelId, stars) => {
+        const currentStars = get().stars;
+        if (stars <= (currentStars[levelId] ?? 0)) return;
 
-      setLastPlayedLevel: (levelId) =>
-        set({ lastPlayedLevel: levelId }),
+        set({ stars: { ...currentStars, [levelId]: stars } });
+      },
 
+      setLastPlayedLevel: (levelId) => {
+        if (get().lastPlayedLevel === levelId) return;
+
+        set({ lastPlayedLevel: levelId });
+      },
       // Apaga todo o progresso salvo.
       resetProgress: () =>
         set({

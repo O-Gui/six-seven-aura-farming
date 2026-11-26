@@ -17,6 +17,7 @@ type Props = {
   textColor: string;
   glowColor?: string;
   fontSize?: number;
+  dimmed?: boolean;
   buttonStyle?: ViewStyle;
   onPress: () => void;
 };
@@ -28,6 +29,7 @@ export default function MenuButton({
   textColor,
   glowColor = colors.cyan,
   fontSize = 24,
+  dimmed = false,
   buttonStyle,
   onPress,
 }: Props) {
@@ -75,7 +77,7 @@ export default function MenuButton({
       <Animated.View style={[styles.fill, body]}>
         <Image
           source={background}
-          style={styles.fill}
+          style={[styles.fill, dimmed && styles.dimmedBackground]}
           resizeMode="contain"
         />
 
@@ -116,7 +118,7 @@ export default function MenuButton({
           ]}
         />
 
-        <View style={styles.content}>
+        <View style={[styles.content, dimmed && styles.dimmedContent]}>
           {icon && (
             <Image
               source={icon}
@@ -158,6 +160,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '100%',
+  },
+
+  dimmedBackground: {
+    opacity: 0.34,
+  },
+  dimmedContent: {
+    opacity: 0.51,
   },
 
   halo: {

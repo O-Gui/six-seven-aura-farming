@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import {
   Image,
@@ -13,6 +13,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -28,7 +29,6 @@ import {
   missPercent,
   unlocksNextLevel,
 } from '../game/scoring';
-import { useGameStore } from '../store/gameStore';
 import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Result'>;
@@ -77,7 +77,8 @@ function PopIn({
         withSpring(1, { damping: 9, stiffness: 140 })
       );
     }
-  }, []);
+    return () => cancelAnimation(progress);
+  }, [delay, enabled, progress]);
 
   const animated = useAnimatedStyle(() => ({
     opacity: Math.min(progress.value * 2, 1),
@@ -88,24 +89,10 @@ function PopIn({
 }
 
 export default function PosGameScreen({ navigation, route }: Props) {
-  const { levelId } = route.params;
+  const { levelId, hits, misses, totalNotes, stars, outcome } = route.params;
+  const leaving = useRef(false);
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-
-  const playedLevelId = useGameStore((s) => s.levelId);
-  const storeHits = useGameStore((s) => s.hits);
-  const storeMisses = useGameStore((s) => s.misses);
-  const storeTotal = useGameStore((s) => s.totalNotes);
-  const storeStars = useGameStore((s) => s.stars);
-  const storeOutcome = useGameStore((s) => s.outcome);
-
-  // Só utiliza os dados se forem da fase que foi jogada.
-  const hasData = playedLevelId === levelId;
-  const hits = hasData ? storeHits : 0;
-  const misses = hasData ? storeMisses : 0;
-  const totalNotes = hasData ? storeTotal : 0;
-  const stars = hasData ? storeStars : 0;
-  const outcome = hasData ? storeOutcome : null;
 
   const hitsPct = hitPercent(hits, totalNotes);
   const missesPct = missPercent(misses, totalNotes);
@@ -138,18 +125,24 @@ export default function PosGameScreen({ navigation, route }: Props) {
   const stateLabel =
     outcome === 'lost' ? 'FASE PERDIDA' : 'FASE CONCLUÍDA';
 
+  const startLevel = (nextId: number) => {
+    if (leaving.current || !navigation.isFocused()) return;
+
+    leaving.current = true;
+    navigation.replace('Game', { levelId: nextId });
+  };
+
   const goNext = () => {
-    if (!canGoNext) return;
-
-    navigation.replace('Game', { levelId: nextLevelId });
+    if (canGoNext) startLevel(nextLevelId);
   };
 
-  const replayLevel = () => {
-    navigation.replace('Game', { levelId });
-  };
+  const replayLevel = () => startLevel(levelId);
 
   const goToLevelList = () => {
-    navigation.navigate('LevelsList');
+    if (leaving.current || !navigation.isFocused()) return;
+
+    leaving.current = true;
+    navigation.popTo('LevelsList');
   };
 
   return (

@@ -1,6 +1,6 @@
 
-import { useAudioPlayer } from 'expo-audio';
-import { BUTTON_SOUND } from '../audio/buttonSound';
+import { useIsFocused } from '@react-navigation/native';
+import { useButtonSound } from '../audio/buttonSound';
 import { useEffect, useRef, useState } from 'react';
 import {
   Image,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import Animated, {
   Easing,
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -43,10 +44,13 @@ export default function MenuScreen({ navigation }: Props) {
     (state) => state.resetProgress
   );
 
+  const isFocused = useIsFocused();
   const breathe = useSharedValue(0);
   const pulse = useSharedValue(0);
 
   useEffect(() => {
+    if (!isFocused) return;
+
     breathe.value = withRepeat(
       withTiming(1, {
         duration: 2400,
@@ -64,19 +68,15 @@ export default function MenuScreen({ navigation }: Props) {
       -1,
       true
     );
-  }, []);
+    return () => {
+      cancelAnimation(breathe);
+      cancelAnimation(pulse);
+    };
+  }, [breathe, isFocused, pulse]);
 
-  const buttonSoundPlayer = useAudioPlayer(BUTTON_SOUND);
-  const isNavigating = useRef(false);
-
-  const playButtonSound = async () => {
-    try {
-      await buttonSoundPlayer.seekTo(0);
-      buttonSoundPlayer.play();
-    } catch (error) {
-      console.warn('Erro ao reproduzir som do botão:', error);
-    }
-  };
+  const playButtonSound = useButtonSound();
+  const playTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(playTimeout.current), []);
 
   // Bordas neon respirando.
   const frameStyle = useAnimatedStyle(() => ({
@@ -88,10 +88,8 @@ export default function MenuScreen({ navigation }: Props) {
     transform: [{ scale: 1 + pulse.value * 0.03 }],
   }));
 
-  const handlePlay = async () => {
-    if (isNavigating.current) return;
-
-    isNavigating.current = true;
+  const handlePlay = () => {
+    if (playTimeout.current !== undefined || !navigation.isFocused()) return;
 
     const levelId =
       lastPlayedLevel !== null &&
@@ -99,15 +97,16 @@ export default function MenuScreen({ navigation }: Props) {
         ? lastPlayedLevel
         : getFirstAvailableLevel();
 
-    await playButtonSound();
+    playButtonSound();
 
-    setTimeout(() => {
-      navigation.navigate('Game', { levelId });
+    playTimeout.current = setTimeout(() => {
+      playTimeout.current = undefined;
+      if (navigation.isFocused()) navigation.navigate('Game', { levelId });
     }, 500);
   };
 
-  const handleReset = async () => {
-    await playButtonSound();
+  const handleReset = () => {
+    playButtonSound();
     resetProgress();
     setResetVisible(false);
   };
@@ -165,8 +164,8 @@ export default function MenuScreen({ navigation }: Props) {
               glowColor={colors.cyan}
               background={require('../../assets/images/botao-menu-azul.png')}
               icon={require('../../assets/images/icon-list-menu.png')}
-              onPress={async () => {
-                await playButtonSound();
+              onPress={() => {
+                playButtonSound();
                 navigation.navigate('LevelsList');
               }}
             />
@@ -178,7 +177,7 @@ export default function MenuScreen({ navigation }: Props) {
               glowColor={colors.purpleText}
               background={require('../../assets/images/botao-menu-roxo.png')}
               onPress={() => {
-                void playButtonSound();
+                playButtonSound();
                 setCreditsVisible(true);
               }}
             />
@@ -186,12 +185,13 @@ export default function MenuScreen({ navigation }: Props) {
             {/* Novo botão RESET */}
             <MenuButton
               label="RESET"
+              dimmed
               fontSize={20}
               textColor="#B6FF7A"
               glowColor="#B6FF7A"
               background={require('../../assets/images/botao-menu-reset.png')}
               onPress={() => {
-                void playButtonSound();
+                playButtonSound();
                 setResetVisible(true);
               }}
             />
@@ -209,7 +209,7 @@ export default function MenuScreen({ navigation }: Props) {
         <Pressable
           style={styles.overlay}
           onPress={() => {
-            void playButtonSound();
+            playButtonSound();
             setCreditsVisible(false);
           }}
         >
@@ -235,7 +235,7 @@ export default function MenuScreen({ navigation }: Props) {
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => {
-              void playButtonSound();
+              playButtonSound();
               setResetVisible(false);
             }}
           />
@@ -254,7 +254,7 @@ export default function MenuScreen({ navigation }: Props) {
               <Pressable
                 style={styles.cancelButton}
                 onPress={() => {
-                  void playButtonSound();
+                  playButtonSound();
                   setResetVisible(false);
                 }}
               >

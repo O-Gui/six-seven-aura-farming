@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
+  cancelAnimation,
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
@@ -35,7 +36,8 @@ export default function AuraBar({
         easing: Easing.out(Easing.quad),
       }
     );
-  }, [percent]);
+    return () => cancelAnimation(fill);
+  }, [fill, percent]);
 
   useEffect(() => {
     riskValue.value = withTiming(
@@ -45,7 +47,8 @@ export default function AuraBar({
         easing: Easing.inOut(Easing.quad),
       }
     );
-  }, [risk]);
+    return () => cancelAnimation(riskValue);
+  }, [risk, riskValue]);
 
   const fillStyle = useAnimatedStyle(() => {
     // Cor-base baseada na porcentagem real de acertos.
@@ -69,7 +72,7 @@ export default function AuraBar({
     );
 
     return {
-      width: `${fill.value}%` as `${number}%`,
+      transform: [{ scaleX: fill.value / 100 }],
       backgroundColor: finalColor,
     };
   });
@@ -94,7 +97,7 @@ export default function AuraBar({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    aspectRatio: 7.6,
+    aspectRatio: 9.5,
   },
   frame: {
     position: 'absolute',
@@ -113,11 +116,13 @@ const styles = StyleSheet.create({
     bottom: '20%',
     borderRadius: 999,
     overflow: 'hidden',
-    padding: 3,
+    padding: 2,
     backgroundColor: colors.auraTrack,
   },
   fill: {
+    width: '100%',
     height: '100%',
+    transformOrigin: 'left center',
     borderRadius: 999,
   },
 });

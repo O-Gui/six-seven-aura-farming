@@ -15,6 +15,7 @@ export type GameStatus =
   | 'countdown'
   | 'playing'
   | 'paused'
+  | 'finishing'
   | 'finished';
 
 export type LevelOutcome = 'lost' | 'completed' | 'perfect';
@@ -27,12 +28,15 @@ type GameState = {
   hits: number;
   misses: number;
   resolved: Record<number, NoteResult>;
+  finalHitIndex: number | null;
   outcome: LevelOutcome | null;
   stars: 0 | 1 | 2 | 3;
 
   startLevel: (levelId: number, totalNotes: number) => void;
   beginPlaying: () => void;
   resolveNote: (noteIndex: number, result: NoteResult) => void;
+  resolveMisses: (noteIndices: readonly number[]) => void;
+  finishLastHit: (noteIndex: number) => void;
   failRemainingNotes: () => void;
   pause: () => void;
   resume: () => void;
@@ -47,9 +51,14 @@ const initialState = {
   hits: 0,
   misses: 0,
   resolved: {} as Record<number, NoteResult>,
+  finalHitIndex: null as number | null,
   outcome: null as LevelOutcome | null,
   stars: 0 as 0 | 1 | 2 | 3,
 };
+
+function isUnresolvedNote(index: number, totalNotes: number, resolved: GameState['resolved']) {
+  return Number.isInteger(index) && index >= 0 && index < totalNotes && resolved[index] === undefined;
+}
 
 export const useGameStore = create<GameState>((set, get) => ({
   ...initialState,
@@ -72,61 +81,71 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   resolveNote: (noteIndex, result) => {
     const state = get();
+    if (state.status !== 'playing') return;
+    if (result === 'miss') {
+      state.resolveMisses([noteIndex]);
+      return;
+    }
+    if (!isUnresolvedNote(noteIndex, state.totalNotes, state.resolved)) return;
 
-    // Só conta durante a partida.
+    const hits = state.hits + 1;
+    const resolved = { ...state.resolved, [noteIndex]: result };
+    if (hits + state.misses === state.totalNotes) {
+      set({ hits, resolved, status: 'finishing', finalHitIndex: noteIndex });
+      return;
+    }
+
+    set({ hits, resolved });
+  },
+
+  resolveMisses: (noteIndices) => {
+    const state = get();
     if (state.status !== 'playing') return;
 
-    // Impede índices inválidos e notas duplicadas.
-    if (
-      !Number.isInteger(noteIndex) ||
-      noteIndex < 0 ||
-      noteIndex >= state.totalNotes ||
-      state.resolved[noteIndex] !== undefined
-    ) {
-      return;
+    const { hits, totalNotes, levelId } = state;
+    let misses = state.misses;
+    let resolved = state.resolved;
+    for (const index of noteIndices) {
+      if (!isUnresolvedNote(index, totalNotes, resolved)) continue;
+
+      if (resolved === state.resolved) resolved = { ...resolved };
+      resolved[index] = 'miss';
+      misses++;
+      const remaining = totalNotes - hits - misses;
+      if (isEarlyDefeat(hits, remaining, totalNotes)) {
+        set({ misses, resolved, status: 'finished', pausedFrom: null, outcome: 'lost', stars: 0 });
+        return;
+      }
+      if (remaining === 0) {
+        const stars = starsFor(hits, totalNotes);
+        useProgressStore.getState().setStars(levelId, stars);
+        set({
+          misses,
+          resolved,
+          status: 'finished',
+          pausedFrom: null,
+          outcome: stars === 3 ? 'perfect' : 'completed',
+          stars,
+        });
+        return;
+      }
     }
 
-    const hits = state.hits + (result === 'hit' ? 1 : 0);
-    const misses = state.misses + (result === 'miss' ? 1 : 0);
-    const remaining = state.totalNotes - hits - misses;
-    const resolved = {
-      ...state.resolved,
-      [noteIndex]: result,
-    };
+    if (resolved !== state.resolved) set({ misses, resolved });
+  },
 
-    // Derrota antecipada: não é mais possível alcançar 51%.
-    if (isEarlyDefeat(hits, remaining, state.totalNotes)) {
-      set({
-        hits,
-        misses,
-        resolved,
-        status: 'finished',
-        pausedFrom: null,
-        outcome: 'lost',
-        stars: 0,
-      });
-      return;
-    }
+  finishLastHit: (noteIndex) => {
+    const state = get();
+    if (state.status !== 'finishing' || state.finalHitIndex !== noteIndex) return;
 
-    // Todas as notas foram resolvidas.
-    if (remaining === 0) {
-      const stars = starsFor(hits, state.totalNotes);
-
-      useProgressStore.getState().setStars(state.levelId, stars);
-
-      set({
-        hits,
-        misses,
-        resolved,
-        status: 'finished',
-        pausedFrom: null,
-        outcome: stars === 3 ? 'perfect' : 'completed',
-        stars,
-      });
-      return;
-    }
-
-    set({ hits, misses, resolved });
+    const stars = starsFor(state.hits, state.totalNotes);
+    useProgressStore.getState().setStars(state.levelId, stars);
+    set({
+      status: 'finished',
+      finalHitIndex: null,
+      outcome: stars === 3 ? 'perfect' : 'completed',
+      stars,
+    });
   },
 
   // Fim da música: toda nota ainda sem resultado vira erro.

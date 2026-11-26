@@ -16,6 +16,8 @@ const BG_UNLOCKED = require('../../assets/images/botao-list-verde.png');
 const BG_LOCKED = require('../../assets/images/botao-list-vermelho.png');
 const ICON_PLAY = require('../../assets/images/icon-play-list.png');
 const ICON_LOCK = require('../../assets/images/icon-lock-list.png');
+const STAR = require('../../assets/images/star.png');
+const STAR_SLOTS = [1, 2, 3];
 
 const LOCK_RED = '#FF3B3B';
 const LOCK_WHITE = '#FFFFFF';
@@ -41,6 +43,7 @@ function disc(size: number, color: string, opacity: number) {
 
 type Props = {
   label: string;
+  earnedStars: number;
   locked: boolean;
   comingSoon?: boolean;
   onPress: () => void;
@@ -48,6 +51,7 @@ type Props = {
 
 export default function LevelButton({
   label,
+  earnedStars,
   locked,
   comingSoon = false,
   onPress,
@@ -154,6 +158,7 @@ export default function LevelButton({
   return (
     <Pressable
       style={styles.button}
+      accessibilityLabel={comingSoon ? label : label + ', ' + earnedStars + ' de 3 estrelas'}
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -161,7 +166,7 @@ export default function LevelButton({
       <Animated.View style={[styles.fill, bodyStyle]}>
         <Image
           source={isUnavailable ? BG_LOCKED : BG_UNLOCKED}
-          style={styles.fill}
+          style={[styles.fill, comingSoon && styles.dimmedBackground]}
           resizeMode="contain"
         />
 
@@ -197,58 +202,50 @@ export default function LevelButton({
         <View style={styles.iconSlot}>
           {isUnavailable ? (
             <Animated.View style={styles.iconBox}>
-              {!comingSoon && (
-                <>
-                  <Animated.View
-                    pointerEvents="none"
-                    style={[styles.haloGroup, whiteHalo]}
-                  >
-                    <View style={disc(76, LOCK_WHITE, 0.12)} />
-                    <View style={disc(58, LOCK_WHITE, 0.2)} />
-                    <View style={disc(44, LOCK_WHITE, 0.3)} />
-                  </Animated.View>
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.haloGroup, whiteHalo]}
+              >
+                <View style={disc(76, LOCK_WHITE, 0.12)} />
+                <View style={disc(58, LOCK_WHITE, 0.2)} />
+                <View style={disc(44, LOCK_WHITE, 0.3)} />
+              </Animated.View>
 
-                  <Animated.View
-                    pointerEvents="none"
-                    style={[styles.haloGroup, redHalo]}
-                  >
-                    <View style={disc(76, LOCK_RED, 0.14)} />
-                    <View style={disc(58, LOCK_RED, 0.24)} />
-                    <View style={disc(44, LOCK_RED, 0.36)} />
-                  </Animated.View>
-                </>
-              )}
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.haloGroup, redHalo]}
+              >
+                <View style={disc(76, LOCK_RED, 0.14)} />
+                <View style={disc(58, LOCK_RED, 0.24)} />
+                <View style={disc(44, LOCK_RED, 0.36)} />
+              </Animated.View>
 
               <Image
                 source={ICON_LOCK}
-                style={styles.icon}
+                style={[styles.icon, comingSoon && styles.dimmedContent]}
                 resizeMode="contain"
               />
 
-              {!comingSoon && (
-                <>
-                  <Animated.Image
-                    source={ICON_LOCK}
-                    resizeMode="contain"
-                    style={[
-                      styles.icon,
-                      styles.iconOverlay,
-                      { tintColor: LOCK_WHITE },
-                      whiteTint,
-                    ]}
-                  />
-                  <Animated.Image
-                    source={ICON_LOCK}
-                    resizeMode="contain"
-                    style={[
-                      styles.icon,
-                      styles.iconOverlay,
-                      { tintColor: LOCK_RED },
-                      redTint,
-                    ]}
-                  />
-                </>
-              )}
+              <Animated.Image
+                source={ICON_LOCK}
+                resizeMode="contain"
+                style={[
+                  styles.icon,
+                  styles.iconOverlay,
+                  { tintColor: LOCK_WHITE },
+                  whiteTint,
+                ]}
+              />
+              <Animated.Image
+                source={ICON_LOCK}
+                resizeMode="contain"
+                style={[
+                  styles.icon,
+                  styles.iconOverlay,
+                  { tintColor: LOCK_RED },
+                  redTint,
+                ]}
+              />
             </Animated.View>
           ) : (
             <View style={styles.iconBox}>
@@ -261,16 +258,32 @@ export default function LevelButton({
           )}
         </View>
 
-        <View style={styles.labelWrap}>
+        <View style={[styles.labelWrap, !comingSoon && styles.ratedRow]}>
           <Animated.Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
             style={[
               styles.label,
+              !comingSoon && styles.ratedLabel,
+              comingSoon && styles.dimmedContent,
               { color: textColor, textShadowColor: glowColor },
               textGlow,
             ]}
           >
             {label}
           </Animated.Text>
+          {!comingSoon && (
+            <View style={styles.stars}>
+              {STAR_SLOTS.map((slot) => (
+                <Image
+                  key={slot}
+                  source={STAR}
+                  resizeMode="contain"
+                  style={[styles.star, slot > earnedStars && styles.starOff]}
+                />
+              ))}
+            </View>
+          )}
         </View>
       </Animated.View>
     </Pressable>
@@ -291,6 +304,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '100%',
+  },
+  dimmedBackground: {
+    opacity: 0.40,
+  },
+  dimmedContent: {
+    opacity: 0.60,
   },
   halo: {
     position: 'absolute',
@@ -353,6 +372,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingLeft: 28,
+  },
+  ratedRow: {
+    flexDirection: 'row',
+    left: '9%',
+    right: '9%',
+    paddingLeft: ICON_SIZE + 8,
+    gap: 8,
+  },
+  ratedLabel: {
+    flexShrink: 1,
+  },
+  stars: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  star: {
+    width: 21,
+    height: 21,
+  },
+  starOff: {
+    tintColor: colors.starOff,
   },
   label: {
     fontSize: 24,
